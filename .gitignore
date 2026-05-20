@@ -43,6 +43,7 @@
 build/
 Build/
 build-*/
+.pio/
 
 # CMake generated files
 CMakeFiles/
@@ -67,3 +68,14 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# ESP-IDF / PlatformIO
+sdkconfig
+sdkconfig.old
+dependencies.lock
+
+# Vendor JS (download separately — see data/www/vendor/README.md)
+data/www/vendor/*.js
+data/www/vendor/*.css
+!data/www/vendor/README.md
+

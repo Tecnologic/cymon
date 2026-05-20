@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cymon — Cyphal Monitor</title>
+  <link rel="stylesheet" href="/app.css" />
+  <!--
+    Vendor JS: for production these files must be downloaded locally and placed
+    in data/www/vendor/ before running `pio run --target uploadfs`.
+
+    Download commands:
+      curl -Lo data/www/vendor/chart.umd.min.js \
+        https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js
+      curl -Lo data/www/vendor/msgpack.min.js \
+        https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0/dist.es5+umd/msgpack.min.js
+      curl -Lo data/www/vendor/alpine.min.js \
+        https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js
+
+    For development (browser connected to lab WiFi) the CDN links below work.
+  -->
+  <script src="/vendor/chart.umd.min.js"
+          onerror="this.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js'">
+  </script>
+  <script src="/vendor/msgpack.min.js"
+          onerror="this.src='https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0/dist.es5+umd/msgpack.min.js'">
+  </script>
+  <script defer src="/vendor/alpine.min.js"
+          onerror="this.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js'">
+  </script>
+</head>
+<body x-data="app()" x-init="init()">
+  <!-- Navigation -->
+  <nav class="navbar">
+    <span class="brand">⚡ cymon</span>
+    <div class="nav-tabs">
+      <button :class="view==='nodes' ? 'active' : ''" @click="view='nodes'">Nodes</button>
+      <button :class="view==='graph' ? 'active' : ''" @click="view='graph'">Graph</button>
+      <button :class="view==='settings' ? 'active' : ''" @click="view='settings'">Settings</button>
+    </div>
+    <span class="status-badge" :class="wsConnected ? 'online' : 'offline'"
+          x-text="wsConnected ? 'WS ●' : 'WS ○'"></span>
+  </nav>
+
+  <!-- ─── Nodes View ─────────────────────────────────────────────────────── -->
+  <section x-show="view==='nodes'" class="view">
+    <h2>Network Nodes</h2>
+    <button @click="fetchNodes()" class="btn">Refresh</button>
+    <table class="node-table">
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Health</th><th>Variables</th></tr>
+      </thead>
+      <tbody>
+        <template x-for="node in nodes" :key="node.id">
+          <tr>
+            <td x-text="node.id"></td>
+            <td x-text="node.name || '—'"></td>
+            <td>
+              <span class="health-badge"
+                    :class="['h'+node.health]"
+                    x-text="['NOMINAL','ADVISORY','CAUTION','WARNING','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','','OFFLINE'][node.health] || node.health"></span>
+            </td>
+            <td>
+              <details>
+                <summary x-text="(node.variables||[]).length + ' var(s)'"></summary>
+                <ul class="var-list">
+                  <template x-for="v in (node.variables||[])" :key="v.id">
+                    <li><code x-text="v.name"></code>
+                        <span class="unit" x-text="v.unit ? '['+v.unit+']' : ''"></span>
+                        <span class="vid" x-text="'#'+v.id"></span>
+                    </li>
+                  </template>
+                </ul>
+              </details>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="nodes.length===0">
+          <td colspan="4" class="empty">No nodes discovered yet.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ─── Graph View ────────────────────────────────────────────────────── -->
+  <section x-show="view==='graph'" class="view">
+    <h2>Oscilloscope</h2>
+
+    <div class="graph-controls">
+      <label>Node ID <input type="number" x-model.number="graphCfg.nodeId" min="1" max="127" /></label>
+      <label>Variable ID <input type="number" x-model.number="graphCfg.varId" min="0" max="255" /></label>
+      <label>Mode
+        <select x-model="graphCfg.mode">
+          <option value="rolling">Rolling</option>
+          <option value="triggered">Triggered</option>
+        </select>
+      </label>
+      <label>Depth (ms) <input type="number" x-model.number="graphCfg.depthMs" min="100" max="10000" step="100" /></label>
+      <button @click="startSession()" class="btn btn-primary">Start</button>
+      <button @click="stopSession()" class="btn btn-danger" x-show="activeSessionId !== null">Stop</button>
+      <button @click="exportCsv()" class="btn" x-show="chartData.length > 0">Export CSV</button>
+    </div>
+
+    <div x-show="graphCfg.mode==='triggered'" class="trigger-controls">
+      <label>Trigger level <input type="number" step="any" x-model.number="graphCfg.triggerLevel" /></label>
+      <label>Edge
+        <select x-model="graphCfg.triggerEdge">
+          <option value="rising">Rising ↑</option>
+          <option value="falling">Falling ↓</option>
+        </select>
+      </label>
+      <button @click="armTrigger()" class="btn" x-show="activeSessionId !== null"
+              x-text="triggered ? 'Disarm' : 'Arm'"></button>
+    </div>
+
+    <div class="chart-wrap">
+      <canvas id="oscCanvas"></canvas>
+    </div>
+
+    <p class="session-info" x-show="activeSessionId !== null"
+       x-text="'Session #' + activeSessionId + ' — ' + sampleCount + ' samples'"></p>
+  </section>
+
+  <!-- ─── Settings View ────────────────────────────────────────────────── -->
+  <section x-show="view==='settings'" class="view">
+    <h2>Settings</h2>
+
+    <div class="settings-card">
+      <h3>WiFi</h3>
+      <label>SSID <input type="text" x-model="wifiCfg.ssid" /></label>
+      <label>Password <input type="password" x-model="wifiCfg.password" /></label>
+      <button @click="saveWifi()" class="btn btn-primary">Save &amp; Connect</button>
+      <span class="status-badge" :class="wifiStatus.connected ? 'online' : 'offline'"
+            x-text="wifiStatus.connected ? ('Connected: '+wifiStatus.ip) : (apMode ? 'AP: cymon-setup' : 'Disconnected')"></span>
+    </div>
+
+    <div class="settings-card">
+      <h3>CAN-FD</h3>
+      <label>Nominal baud (kbps)
+        <select x-model.number="canCfg.nominalKbps">
+          <option>125</option><option>250</option><option>500</option><option>1000</option>
+        </select>
+      </label>
+      <label>Data baud (Mbps)
+        <select x-model.number="canCfg.dataMbps">
+          <option>1</option><option>2</option><option>4</option><option>5</option><option>8</option>
+        </select>
+      </label>
+      <button @click="saveCan()" class="btn btn-primary">Apply</button>
+    </div>
+  </section>
+
+  <script src="/app.js"></script>
+</body>
+</html>

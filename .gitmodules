@@ -1,0 +1,4 @@
+[submodule "lib/cymon-lib"]
+	path = lib/cymon-lib
+	url = https://github.com/Tecnologic/cymon-lib.git
+	branch = main
