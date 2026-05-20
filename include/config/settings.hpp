@@ -13,7 +13,7 @@ enum class WifiMode : uint8_t {
 /// CAN-FD baud rate pair.
 struct CanBaud {
   uint32_t nominal_kbps{500};  ///< Nominal / arbitration phase kbit/s
-  uint32_t data_mbps{2};       ///< Data phase Mbit/s (CAN-FD BRS)
+  uint32_t data_mbps{4};       ///< Data phase Mbit/s (CAN-FD BRS)
 };
 
 /// Persistent runtime settings stored in NVS.

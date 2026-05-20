@@ -206,7 +206,7 @@ esp_err_t ApiHandlePostWifi(httpd_req_t* req) {
 
 // ---------------------------------------------------------------------------
 // POST /api/can
-// Body: {"nominal_kbps":500,"data_mbps":2}
+// Body: {"nominal_kbps":500,"data_mbps":4}
 // ---------------------------------------------------------------------------
 esp_err_t ApiHandlePostCan(httpd_req_t* req) {
   std::string body;
