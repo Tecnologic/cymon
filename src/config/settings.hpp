@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "config/settings.hpp"
+#include "../include/config/settings.hpp"
 #include "esp_err.h"
 #include "nvs_flash.h"
 

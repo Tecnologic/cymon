@@ -125,8 +125,8 @@ void CyphalNode::HandleRegisterAccess(const CanardRxTransfer& /*transfer*/) {
   meta.priority = CanardPriorityNominal;
   meta.transfer_kind = CanardTransferKindResponse;
   meta.port_id = kRegisterAccessServiceId;
-  meta.remote_node_id = CANARD_NODE_ID_UNSET;
-  meta.transfer_id = 0;
+  meta.remote_node_id = transfer.metadata.remote_node_id;
+  meta.transfer_id = transfer.metadata.transfer_id;
 
   transport_.Transmit(meta, sizeof(resp), resp);
 }
