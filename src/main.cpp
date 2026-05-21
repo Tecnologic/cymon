@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstring>
 
 #include "can/cyphal_transport.hpp"
 #include "can/mcp2518fd.hpp"
@@ -11,10 +10,10 @@
 #include "cyphal/timesync.hpp"
 #include "cyphal/variable_fetcher.hpp"
 #include "esp_efuse.h"
-#include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "logging/logger.hpp"
 #include "monitor/session_manager.hpp"
 #include "nvs_flash.h"
 #include "web/api_handlers.hpp"

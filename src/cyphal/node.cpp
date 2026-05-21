@@ -4,8 +4,8 @@
 #include <cstring>
 #include <string>
 
-#include "esp_log.h"
 #include "esp_timer.h"
+#include "logging/logger.hpp"
 
 namespace cymon {
 

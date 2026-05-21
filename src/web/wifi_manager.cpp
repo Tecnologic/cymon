@@ -3,10 +3,10 @@
 #include <cstring>
 
 #include "esp_event.h"
-#include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_sntp.h"
 #include "esp_wifi.h"
+#include "logging/logger.hpp"
 #include "lwip/ip4_addr.h"
 
 namespace cymon {

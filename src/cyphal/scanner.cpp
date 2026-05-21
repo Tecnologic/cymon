@@ -1,6 +1,6 @@
 #include "cyphal/scanner.hpp"
 
-#include "esp_log.h"
+#include "logging/logger.hpp"
 
 namespace cymon {
 

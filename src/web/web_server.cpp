@@ -2,8 +2,8 @@
 
 #include <cstring>
 
-#include "esp_log.h"
 #include "esp_spiffs.h"
+#include "logging/logger.hpp"
 #include "web/api_handlers.hpp"
 
 namespace cymon {

@@ -6,7 +6,7 @@
 
 #include "can/mcp2518fd.hpp"
 #include "config/settings.hpp"
-#include "esp_log.h"
+#include "logging/logger.hpp"
 #include "monitor/monitor_session.hpp"
 #include "monitor/node_record.hpp"
 #include "monitor/session_manager.hpp"

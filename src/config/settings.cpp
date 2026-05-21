@@ -1,6 +1,6 @@
 #include "config/settings.hpp"
 
-#include "esp_log.h"
+#include "logging/logger.hpp"
 #include "nvs.h"
 
 namespace cymon {
