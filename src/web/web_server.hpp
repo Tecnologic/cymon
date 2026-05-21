@@ -11,6 +11,7 @@ namespace cymon {
 class WebServer {
  public:
   static constexpr uint16_t kPort = 80;
+  static constexpr size_t kMaxOpenSockets = 7;
 
   WebServer() = default;
   ~WebServer();

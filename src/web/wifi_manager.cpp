@@ -27,7 +27,9 @@ WifiManager::~WifiManager() {
 // ---------------------------------------------------------------------------
 void WifiManager::Init(std::string_view ssid, std::string_view password) {
   std::strncpy(ssid_, ssid.data(), Settings::kSsidMaxLen);
+  ssid_[Settings::kSsidMaxLen] = '\0';
   std::strncpy(password_, password.data(), Settings::kPassMaxLen);
+  password_[Settings::kPassMaxLen] = '\0';
 
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -56,7 +58,9 @@ void WifiManager::Init(std::string_view ssid, std::string_view password) {
 // ---------------------------------------------------------------------------
 void WifiManager::Reconnect(std::string_view ssid, std::string_view password) {
   std::strncpy(ssid_, ssid.data(), Settings::kSsidMaxLen);
+  ssid_[Settings::kSsidMaxLen] = '\0';
   std::strncpy(password_, password.data(), Settings::kPassMaxLen);
+  password_[Settings::kPassMaxLen] = '\0';
   retry_count_ = 0;
   connected_ = false;
   ap_mode_ = false;
@@ -96,12 +100,12 @@ void WifiManager::StartAp() {
 // ---------------------------------------------------------------------------
 // EventHandler
 // ---------------------------------------------------------------------------
-void WifiManager::EventHandler(void* arg, int32_t event_id, void* event_data) {
+void WifiManager::EventHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
   auto* self = static_cast<WifiManager*>(arg);
 
-  if (event_id == WIFI_EVENT_STA_START) {
+  if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
     esp_wifi_connect();
-  } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+  } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
     self->connected_ = false;
     if (self->retry_count_ < kMaxRetries) {
       ++self->retry_count_;
@@ -110,7 +114,7 @@ void WifiManager::EventHandler(void* arg, int32_t event_id, void* event_data) {
     } else {
       self->StartAp();
     }
-  } else if (event_id == IP_EVENT_STA_GOT_IP) {
+  } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
     const auto* evt = static_cast<const ip_event_got_ip_t*>(event_data);
     esp_ip4addr_ntoa(&evt->ip_info.ip, self->ip_str_, sizeof(self->ip_str_));
     self->connected_ = true;

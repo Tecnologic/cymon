@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "config/settings.hpp"
+#include "esp_event.h"
 
 namespace cymon {
 
@@ -43,7 +44,7 @@ class WifiManager {
   }
 
  private:
-  static void EventHandler(void* arg, int32_t event_id, void* event_data);
+  static void EventHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
   void StartAp();
 
   ConnectedCallback on_state_change_;

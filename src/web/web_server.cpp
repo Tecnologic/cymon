@@ -37,7 +37,7 @@ bool WebServer::Start() {
 
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = kPort;
-  config.max_open_sockets = 7;
+  config.max_open_sockets = kMaxOpenSockets;
   config.lru_purge_enable = true;
   config.uri_match_fn = httpd_uri_match_wildcard;
 
@@ -94,7 +94,7 @@ void WebServer::BroadcastWs(const uint8_t* data, size_t len) {
   frame.len = len;
 
   // Iterate over all open file descriptors and send to WebSocket clients
-  int client_fds[8]{};
+  int client_fds[kMaxOpenSockets]{};
   size_t clients = std::size(client_fds);
   if (httpd_get_client_list(server_, &clients, client_fds) == ESP_OK) {
     for (size_t i = 0; i < clients; ++i) {
@@ -124,35 +124,42 @@ esp_err_t WebServer::HandleWebSocket(httpd_req_t* req) {
 }
 
 // ---------------------------------------------------------------------------
-// HandleStaticFile — serve from SPIFFS /spiffs/www/<uri>
+// HandleStaticFile — serve only the known SPA assets from SPIFFS /spiffs/www/
+// All other URIs fall back to index.html for client-side SPA routing.
 // ---------------------------------------------------------------------------
 esp_err_t WebServer::HandleStaticFile(httpd_req_t* req) {
-  char path[128];
-  snprintf(path, sizeof(path), "%s/www%s", kSpiffsBase, (std::strcmp(req->uri, "/") == 0) ? "/index.html" : req->uri);
+  // Known asset whitelist — path is never derived from req->uri.
+  struct AssetEntry {
+    const char* uri;
+    const char* path;
+    const char* content_type;
+  };
+  static constexpr AssetEntry kAssets[] = {
+      {"/", "/spiffs/www/index.html", "text/html"},
+      {"/index.html", "/spiffs/www/index.html", "text/html"},
+      {"/app.js", "/spiffs/www/app.js", "application/javascript"},
+      {"/app.css", "/spiffs/www/app.css", "text/css"},
+  };
 
-  FILE* f = fopen(path, "r");
-  if (f == nullptr) {
-    // Fallback to index.html for SPA routing
-    snprintf(path, sizeof(path), "%s/www/index.html", kSpiffsBase);
-    f = fopen(path, "r");
-    if (f == nullptr) {
-      httpd_resp_send_404(req);
-      return ESP_FAIL;
+  // Default: serve index.html (SPA entry point / client-side routing fallback)
+  const char* file_path = "/spiffs/www/index.html";
+  const char* content_type = "text/html";
+
+  for (const auto& asset : kAssets) {
+    if (std::strcmp(req->uri, asset.uri) == 0) {
+      file_path = asset.path;
+      content_type = asset.content_type;
+      break;
     }
   }
 
-  // Determine content type
-  const char* content_type = "application/octet-stream";
-  if (std::strstr(path, ".html"))
-    content_type = "text/html";
-  else if (std::strstr(path, ".js"))
-    content_type = "application/javascript";
-  else if (std::strstr(path, ".css"))
-    content_type = "text/css";
-  else if (std::strstr(path, ".json"))
-    content_type = "application/json";
-  httpd_resp_set_type(req, content_type);
+  FILE* f = fopen(file_path, "r");
+  if (f == nullptr) {
+    httpd_resp_send_404(req);
+    return ESP_FAIL;
+  }
 
+  httpd_resp_set_type(req, content_type);
   char buf[512];
   size_t n;
   while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
