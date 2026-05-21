@@ -109,8 +109,7 @@ bool Mcp2518fd::Init() {
   gpio_isr_handler_add(static_cast<gpio_num_t>(pins_.int_pin), GpioIsrHandler, nullptr);
 
   initialized_ = true;
-  CYMON_LOGI(kTag, "MCP2518FD initialised, nominal=%u kbps, data=%u Mbps", baud_.nominal_kbps,
-             baud_.data_mbps);
+  CYMON_LOGI(kTag, "MCP2518FD initialised, nominal=%u kbps, data=%u Mbps", baud_.nominal_kbps, baud_.data_mbps);
   return true;
 }
 
@@ -238,8 +237,8 @@ bool Mcp2518fd::SpiWriteWord(uint16_t addr, uint32_t word) {
 uint32_t Mcp2518fd::SpiReadWord(uint16_t addr) {
   uint8_t data[4]{};
   SpiRead(addr, data, 4);
-  return static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
-         (static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
+  return static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) | (static_cast<uint32_t>(data[2]) << 16) |
+         (static_cast<uint32_t>(data[3]) << 24);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,9 +286,9 @@ bool Mcp2518fd::ConfigureCanFd(const BaudConfig& baud) {
   }
 
   // CiCON: FDF=1, ISOCRCEN=1, WAKFIL=1, DNCNT=0
-  const uint32_t con = (1u << 7) |   // ISOCRCEN
-                       (1u << 6) |   // WAKFIL
-                       (0u << 24);   // reqop = configuration (already in config mode)
+  const uint32_t con = (1u << 7) |  // ISOCRCEN
+                       (1u << 6) |  // WAKFIL
+                       (0u << 24);  // reqop = configuration (already in config mode)
   return SpiWriteWord(mcp2518fd_reg::kCiCon, con);
 }
 
@@ -315,9 +314,9 @@ bool Mcp2518fd::ConfigureFifos() {
   }
 
   // FIFO2 — RX, depth=8, payload=64
-  const uint32_t fifo2 = (0u << 7) |   // TXEN=0 (RX)
-                         (7u << 0) |   // FSIZE=7 (8 entries)
-                         (7u << 11);   // PLSIZE=7
+  const uint32_t fifo2 = (0u << 7) |  // TXEN=0 (RX)
+                         (7u << 0) |  // FSIZE=7 (8 entries)
+                         (7u << 11);  // PLSIZE=7
   if (!SpiWriteWord(mcp2518fd_reg::kCiFifocon2, fifo2)) {
     return false;
   }
@@ -374,10 +373,10 @@ bool Mcp2518fd::ReadRxObject(CanFrame& frame, uint8_t fifo_num) {
     return false;
   }
 
-  const uint32_t t0 = static_cast<uint32_t>(obj[0]) | (static_cast<uint32_t>(obj[1]) << 8) |
-                      (static_cast<uint32_t>(obj[2]) << 16) | (static_cast<uint32_t>(obj[3]) << 24);
-  const uint32_t t1 = static_cast<uint32_t>(obj[4]) | (static_cast<uint32_t>(obj[5]) << 8) |
-                      (static_cast<uint32_t>(obj[6]) << 16) | (static_cast<uint32_t>(obj[7]) << 24);
+  const uint32_t t0 = static_cast<uint32_t>(obj[0]) | (static_cast<uint32_t>(obj[1]) << 8) | (static_cast<uint32_t>(obj[2]) << 16) |
+                      (static_cast<uint32_t>(obj[3]) << 24);
+  const uint32_t t1 = static_cast<uint32_t>(obj[4]) | (static_cast<uint32_t>(obj[5]) << 8) | (static_cast<uint32_t>(obj[6]) << 16) |
+                      (static_cast<uint32_t>(obj[7]) << 24);
 
   frame.extended_id = (t0 >> 4) & 1u;
   frame.fd_frame = (t1 >> 4) & 1u;
@@ -434,12 +433,12 @@ bool Mcp2518fd::WriteTxObject(const CanFrame& frame) {
   }
   // DLC — find code from length
   static constexpr uint8_t kLenTable[65] = {
-      0, 1, 2, 3, 4, 5, 6, 7, 8,  // 0–8
-      9, 9, 9, 9,                   // 9–12 → DLC 9
-      10, 10, 10, 10,               // 13–16 → DLC 10
-      11, 11, 11, 11,               // 17–20 → DLC 11
-      12, 12, 12, 12,               // 21–24 → DLC 12
-      13, 13, 13, 13, 13, 13, 13, 13,  // 25–32 → DLC 13
+      0,  1,  2,  3,  4,  5,  6,  7,  8,                               // 0–8
+      9,  9,  9,  9,                                                   // 9–12 → DLC 9
+      10, 10, 10, 10,                                                  // 13–16 → DLC 10
+      11, 11, 11, 11,                                                  // 17–20 → DLC 11
+      12, 12, 12, 12,                                                  // 21–24 → DLC 12
+      13, 13, 13, 13, 13, 13, 13, 13,                                  // 25–32 → DLC 13
       14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,  // 33–48 → DLC 14
       15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15   // 49–64 → DLC 15
   };

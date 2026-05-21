@@ -15,8 +15,7 @@ NetworkScanner::NetworkScanner(CyphalTransport& transport, NodeChangedCallback o
                        /*extent=*/7, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
   transport_.SetRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindMessage &&
-        t.metadata.port_id == kHeartbeatSubjectId) {
+    if (t.metadata.transfer_kind == CanardTransferKindMessage && t.metadata.port_id == kHeartbeatSubjectId) {
       HandleHeartbeat(t);
     }
   });
@@ -54,8 +53,7 @@ void NetworkScanner::HandleHeartbeat(const CanardRxTransfer& transfer) {
 // ---------------------------------------------------------------------------
 void NetworkScanner::Tick(uint64_t now_us) {
   for (auto& [id, rec] : nodes_) {
-    if (rec.health != NodeHealth::kOffline &&
-        (now_us - rec.last_heartbeat_us) > kOfflineTimeoutUs) {
+    if (rec.health != NodeHealth::kOffline && (now_us - rec.last_heartbeat_us) > kOfflineTimeoutUs) {
       CYMON_LOGW(kTag, "Node %u went offline", id);
       rec.health = NodeHealth::kOffline;
       if (on_change_) {

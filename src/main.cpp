@@ -66,16 +66,15 @@ extern "C" void app_main() {
   static cymon::Mcp2518fd can_driver(kCanPins, baud);
   if (!can_driver.Init()) {
     CYMON_LOGE(kTag, "CAN driver init failed — halting");
-    for (;;) vTaskDelay(portMAX_DELAY);
+    for (;;)
+      vTaskDelay(portMAX_DELAY);
   }
 
   // Cyphal transport
   static cymon::CyphalTransport transport(cfg.cyphal_node_id);
 
   // Wire CAN → Cyphal
-  can_driver.SetRxCallback([&transport](const cymon::CanFrame& frame) {
-    transport.Push(frame);
-  });
+  can_driver.SetRxCallback([&transport](const cymon::CanFrame& frame) { transport.Push(frame); });
 
   // Cyphal node
   cymon::CyphalNode::NodeInfo node_info{};
@@ -85,21 +84,18 @@ extern "C" void app_main() {
 
   // Network scanner
   static cymon::NetworkScanner scanner(transport, [](const cymon::NodeRecord& rec) {
-    CYMON_LOGI(kTag, "Node %u changed health=%u", rec.node_id,
-               static_cast<uint8_t>(rec.health));
+    CYMON_LOGI(kTag, "Node %u changed health=%u", rec.node_id, static_cast<uint8_t>(rec.health));
   });
 
   // Variable fetcher
-  static cymon::VariableFetcher var_fetcher(
-      transport, [](uint8_t node_id, const std::vector<cymon::VariableInfo>& vars) {
-        CYMON_LOGI(kTag, "Node %u: %zu variables", node_id, vars.size());
-      });
+  static cymon::VariableFetcher var_fetcher(transport, [](uint8_t node_id, const std::vector<cymon::VariableInfo>& vars) {
+    CYMON_LOGI(kTag, "Node %u: %zu variables", node_id, vars.size());
+  });
 
   // Subject scanner
-  static cymon::SubjectScanner subj_scanner(
-      transport, [](uint8_t node_id, const std::vector<cymon::SubjectInfo>& subs) {
-        CYMON_LOGI(kTag, "Node %u: %zu subjects", node_id, subs.size());
-      });
+  static cymon::SubjectScanner subj_scanner(transport, [](uint8_t node_id, const std::vector<cymon::SubjectInfo>& subs) {
+    CYMON_LOGI(kTag, "Node %u: %zu subjects", node_id, subs.size());
+  });
 
   // PnP allocator
   static cymon::PnpAllocator pnp_allocator(transport);
@@ -119,8 +115,7 @@ extern "C" void app_main() {
   static cymon::WsStreamer ws_streamer(g_session_manager, web_server);
 
   // Inject globals into API handlers
-  cymon::InitApiGlobals(&g_session_manager, &scanner.Nodes(), &wifi_manager, &can_driver,
-                        &g_nvs_settings);
+  cymon::InitApiGlobals(&g_session_manager, &scanner.Nodes(), &wifi_manager, &can_driver, &g_nvs_settings);
 
   // Create tasks
   // Store pointers needed by tasks in static context
@@ -135,8 +130,8 @@ extern "C" void app_main() {
     cymon::TimeSyncProvider* timesync;
     cymon::WsStreamer* ws;
   };
-  static TaskArgs args{&can_driver, &transport, &cyphal_node, &scanner, &var_fetcher,
-                       &subj_scanner, &pnp_allocator, &time_sync, &ws_streamer};
+  static TaskArgs args{&can_driver,   &transport,     &cyphal_node, &scanner,    &var_fetcher,
+                       &subj_scanner, &pnp_allocator, &time_sync,   &ws_streamer};
 
   xTaskCreatePinnedToCore(CanRxTaskBody, "can_rx", 4096, &args, 20, nullptr, 1);
   xTaskCreatePinnedToCore(CyphalProcessTaskBody, "cyp_proc", 6144, &args, 18, nullptr, 1);
@@ -150,9 +145,10 @@ extern "C" void app_main() {
 // Task implementations
 // ---------------------------------------------------------------------------
 static void CanRxTaskBody(void* arg) {
-  auto* a = static_cast<struct {
+  struct LocalArgs {
     cymon::Mcp2518fd* can;
-  }*>(arg);
+  };
+  auto* a = static_cast<LocalArgs*>(arg);
   a->can->RxTask();  // Never returns
 }
 

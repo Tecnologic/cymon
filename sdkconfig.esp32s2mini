@@ -1,0 +1,30 @@
+#
+# Minimal sdkconfig for ESP32-S2 (lolin_s2_mini) with ESP-IDF 6.x via PlatformIO.
+# This file satisfies PlatformIO's sdkconfig existence check on first build.
+# ESP-IDF's cmake will expand it to the full configuration during configure.
+# Edit sdkconfig.defaults for persistent option overrides.
+#
+CONFIG_IDF_TARGET="esp32s2"
+CONFIG_IDF_TARGET_ARCH_XTENSA=y
+CONFIG_IDF_TARGET_ESP32S2=y
+
+# From sdkconfig.defaults ---------------------------------------------------
+CONFIG_FREERTOS_HZ=1000
+# CONFIG_FREERTOS_UNICORE is not set
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_DEFAULT_LEVEL=3
+CONFIG_SPIFFS_MAX_PARTITIONS=1
+CONFIG_SPIFFS_OBJ_NAME_LEN=64
+CONFIG_SPIFFS_USE_MAGIC=y
+# CONFIG_NVS_ASSERT_ERROR_CHECK is not set
+CONFIG_LWIP_MAX_SOCKETS=16
+CONFIG_LWIP_SO_RCVBUF=y
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+CONFIG_HTTPD_MAX_URI_LEN=512
+CONFIG_HTTPD_WS_SUPPORT=y
+CONFIG_LWIP_SNTP_MAX_SERVERS=2
+CONFIG_SNTP_TIME_SYNC_METHOD_IMMED=y
+CONFIG_SPI_MASTER_IN_IRAM=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"

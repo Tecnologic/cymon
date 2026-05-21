@@ -25,8 +25,8 @@ static WifiManager* g_wifi_manager = nullptr;
 static Mcp2518fd* g_can_driver = nullptr;
 static NvsSettings* g_settings = nullptr;
 
-void InitApiGlobals(SessionManager* sm, const std::map<uint8_t, NodeRecord>* nodes,
-                    WifiManager* wifi, Mcp2518fd* can, NvsSettings* settings) {
+void InitApiGlobals(SessionManager* sm, const std::map<uint8_t, NodeRecord>* nodes, WifiManager* wifi, Mcp2518fd* can,
+                    NvsSettings* settings) {
   g_session_manager = sm;
   g_node_table = nodes;
   g_wifi_manager = wifi;
@@ -66,7 +66,8 @@ esp_err_t ApiHandleGetNodes(httpd_req_t* req) {
   bool first = true;
   if (g_node_table) {
     for (const auto& [id, rec] : *g_node_table) {
-      if (!first) body += ",";
+      if (!first)
+        body += ",";
       first = false;
       body += "{";
       body += JsonInt("id", id) + ",";
@@ -75,10 +76,10 @@ esp_err_t ApiHandleGetNodes(httpd_req_t* req) {
       body += "\"variables\":[";
       bool fv = true;
       for (const auto& v : rec.variables) {
-        if (!fv) body += ",";
+        if (!fv)
+          body += ",";
         fv = false;
-        body += "{" + JsonInt("id", v.variable_id) + "," + JsonString("name", v.name) + "," +
-                JsonString("unit", v.unit) + "}";
+        body += "{" + JsonInt("id", v.variable_id) + "," + JsonString("name", v.name) + "," + JsonString("unit", v.unit) + "}";
       }
       body += "]";
       body += "}";
@@ -114,7 +115,8 @@ esp_err_t ApiHandlePostSession(httpd_req_t* req) {
   while (*p) {
     const char* nid_pos = std::strstr(p, "\"node_id\":");
     const char* vid_pos = std::strstr(p, "\"variable_id\":");
-    if (!nid_pos || !vid_pos) break;
+    if (!nid_pos || !vid_pos)
+      break;
     const uint8_t nid = static_cast<uint8_t>(std::atoi(nid_pos + 10));
     const uint8_t vid = static_cast<uint8_t>(std::atoi(vid_pos + 14));
     cfgs.push_back(ChannelConfig{{nid, vid}, ""});
@@ -126,9 +128,7 @@ esp_err_t ApiHandlePostSession(httpd_req_t* req) {
     return ESP_FAIL;
   }
 
-  const SessionMode mode = (std::strstr(body.c_str(), "triggered"))
-                               ? SessionMode::kTriggered
-                               : SessionMode::kRolling;
+  const SessionMode mode = (std::strstr(body.c_str(), "triggered")) ? SessionMode::kTriggered : SessionMode::kRolling;
 
   const uint8_t id = g_session_manager->CreateSession(cfgs, mode);
   if (id == 0xFF) {
@@ -177,10 +177,12 @@ esp_err_t ApiHandlePostWifi(httpd_req_t* req) {
   auto extract = [&](const char* key) -> std::string {
     const std::string search = std::string("\"") + key + "\":\"";
     const char* pos = std::strstr(body.c_str(), search.c_str());
-    if (!pos) return {};
+    if (!pos)
+      return {};
     pos += search.size();
     const char* end = std::strchr(pos, '"');
-    if (!end) return {};
+    if (!end)
+      return {};
     return std::string(pos, static_cast<size_t>(end - pos));
   };
 

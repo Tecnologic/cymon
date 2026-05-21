@@ -16,14 +16,12 @@ static constexpr std::string_view kPubPrefix = "uavcan.pub.";
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
-SubjectScanner::SubjectScanner(CyphalTransport& transport, DoneCallback on_done)
-    : transport_(transport), on_done_(std::move(on_done)) {
+SubjectScanner::SubjectScanner(CyphalTransport& transport, DoneCallback on_done) : transport_(transport), on_done_(std::move(on_done)) {
   transport_.Subscribe(CanardTransferKindResponse, kRegisterListServiceId,
                        /*extent=*/261, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
   transport_.SetRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindResponse &&
-        t.metadata.port_id == kRegisterListServiceId) {
+    if (t.metadata.transfer_kind == CanardTransferKindResponse && t.metadata.port_id == kRegisterListServiceId) {
       HandleResponse(t);
     }
   });
@@ -70,7 +68,8 @@ void SubjectScanner::Tick(uint64_t now_us) {
   if (pending_node_id_ != CANARD_NODE_ID_UNSET && now_us > request_deadline_us_) {
     CYMON_LOGW(kTag, "register.List page %u from node %u timed out", next_index_, pending_node_id_);
     // Complete with what we have so far
-    if (on_done_) on_done_(pending_node_id_, accumulated_);
+    if (on_done_)
+      on_done_(pending_node_id_, accumulated_);
     pending_node_id_ = CANARD_NODE_ID_UNSET;
   }
 }

@@ -12,7 +12,7 @@ permissions:
 jobs:
   host-tests:
     name: Build & Test (Linux)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -35,7 +35,8 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -S host
 
       - name: Build
         run: cmake --build build --parallel

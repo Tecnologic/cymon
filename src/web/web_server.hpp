@@ -1,6 +1,7 @@
 #pragma once
 
 #include <esp_http_server.h>
+
 #include <functional>
 
 namespace cymon {
@@ -18,7 +19,9 @@ class WebServer {
   bool Start();
   void Stop();
 
-  [[nodiscard]] bool IsRunning() const { return server_ != nullptr; }
+  [[nodiscard]] bool IsRunning() const {
+    return server_ != nullptr;
+  }
 
   /// Send a binary WebSocket frame to all connected WS clients.
   void BroadcastWs(const uint8_t* data, size_t len);

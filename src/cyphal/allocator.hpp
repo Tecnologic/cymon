@@ -21,7 +21,9 @@ class PnpAllocator {
 
   void Tick(uint64_t now_us);
 
-  [[nodiscard]] bool IsActive() const { return active_; }
+  [[nodiscard]] bool IsActive() const {
+    return active_;
+  }
 
  private:
   void HandleAllocationData(const CanardRxTransfer& transfer);

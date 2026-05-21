@@ -14,7 +14,9 @@ static constexpr const char* kSpiffsBase = "/spiffs";
 // ---------------------------------------------------------------------------
 // Destructor
 // ---------------------------------------------------------------------------
-WebServer::~WebServer() { Stop(); }
+WebServer::~WebServer() {
+  Stop();
+}
 
 // ---------------------------------------------------------------------------
 // Start
@@ -121,8 +123,7 @@ esp_err_t WebServer::HandleWebSocket(httpd_req_t* req) {
 // ---------------------------------------------------------------------------
 esp_err_t WebServer::HandleStaticFile(httpd_req_t* req) {
   char path[128];
-  snprintf(path, sizeof(path), "%s/www%s", kSpiffsBase,
-           (std::strcmp(req->uri, "/") == 0) ? "/index.html" : req->uri);
+  snprintf(path, sizeof(path), "%s/www%s", kSpiffsBase, (std::strcmp(req->uri, "/") == 0) ? "/index.html" : req->uri);
 
   FILE* f = fopen(path, "r");
   if (f == nullptr) {
@@ -137,10 +138,14 @@ esp_err_t WebServer::HandleStaticFile(httpd_req_t* req) {
 
   // Determine content type
   const char* content_type = "application/octet-stream";
-  if (std::strstr(path, ".html")) content_type = "text/html";
-  else if (std::strstr(path, ".js"))   content_type = "application/javascript";
-  else if (std::strstr(path, ".css"))  content_type = "text/css";
-  else if (std::strstr(path, ".json")) content_type = "application/json";
+  if (std::strstr(path, ".html"))
+    content_type = "text/html";
+  else if (std::strstr(path, ".js"))
+    content_type = "application/javascript";
+  else if (std::strstr(path, ".css"))
+    content_type = "text/css";
+  else if (std::strstr(path, ".json"))
+    content_type = "application/json";
   httpd_resp_set_type(req, content_type);
 
   char buf[512];
@@ -154,11 +159,23 @@ esp_err_t WebServer::HandleStaticFile(httpd_req_t* req) {
 }
 
 // Forward the REST handler implementations to api_handlers.cpp
-esp_err_t WebServer::HandleGetNodes(httpd_req_t* req)    { return ApiHandleGetNodes(req); }
-esp_err_t WebServer::HandlePostSession(httpd_req_t* req) { return ApiHandlePostSession(req); }
-esp_err_t WebServer::HandleDeleteSession(httpd_req_t* req){ return ApiHandleDeleteSession(req); }
-esp_err_t WebServer::HandlePostWifi(httpd_req_t* req)    { return ApiHandlePostWifi(req); }
-esp_err_t WebServer::HandlePostCan(httpd_req_t* req)     { return ApiHandlePostCan(req); }
-esp_err_t WebServer::HandleGetSettings(httpd_req_t* req) { return ApiHandleGetSettings(req); }
+esp_err_t WebServer::HandleGetNodes(httpd_req_t* req) {
+  return ApiHandleGetNodes(req);
+}
+esp_err_t WebServer::HandlePostSession(httpd_req_t* req) {
+  return ApiHandlePostSession(req);
+}
+esp_err_t WebServer::HandleDeleteSession(httpd_req_t* req) {
+  return ApiHandleDeleteSession(req);
+}
+esp_err_t WebServer::HandlePostWifi(httpd_req_t* req) {
+  return ApiHandlePostWifi(req);
+}
+esp_err_t WebServer::HandlePostCan(httpd_req_t* req) {
+  return ApiHandlePostCan(req);
+}
+esp_err_t WebServer::HandleGetSettings(httpd_req_t* req) {
+  return ApiHandleGetSettings(req);
+}
 
 }  // namespace cymon

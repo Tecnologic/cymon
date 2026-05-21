@@ -80,7 +80,7 @@ pio run --environment esp32s2mini --target uploadfs
 ### Host tests (Linux, no hardware)
 
 ```bash
-cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++
+cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++ -S host
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```

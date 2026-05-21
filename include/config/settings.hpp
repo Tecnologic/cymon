@@ -6,7 +6,7 @@ namespace cymon {
 
 /// WiFi operating mode.
 enum class WifiMode : uint8_t {
-  kStation = 0,    ///< Connect to an AP
+  kStation = 0,      ///< Connect to an AP
   kAccessPoint = 1,  ///< Run as AP (fallback)
 };
 

@@ -32,9 +32,15 @@ class WifiManager {
   /// Reconfigure credentials (persists them) and reconnect.
   void Reconnect(std::string_view ssid, std::string_view password);
 
-  [[nodiscard]] bool IsConnected() const { return connected_; }
-  [[nodiscard]] bool IsApMode() const { return ap_mode_; }
-  [[nodiscard]] const char* Ip() const { return ip_str_; }
+  [[nodiscard]] bool IsConnected() const {
+    return connected_;
+  }
+  [[nodiscard]] bool IsApMode() const {
+    return ap_mode_;
+  }
+  [[nodiscard]] const char* Ip() const {
+    return ip_str_;
+  }
 
  private:
   static void EventHandler(void* arg, int32_t event_id, void* event_data);

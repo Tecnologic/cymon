@@ -30,8 +30,7 @@ struct Sample {
 /// returned as-is.
 template <size_t Capacity>
 class TimestampedRingBuffer {
-  static_assert(Capacity > 0 && (Capacity & (Capacity - 1)) == 0,
-                "Capacity must be a power of two");
+  static_assert(Capacity > 0 && (Capacity & (Capacity - 1)) == 0, "Capacity must be a power of two");
 
  public:
   static constexpr size_t kCapacity = Capacity;
@@ -75,7 +74,9 @@ class TimestampedRingBuffer {
     return count_.load(std::memory_order_acquire);
   }
 
-  [[nodiscard]] bool Empty() const noexcept { return Size() == 0; }
+  [[nodiscard]] bool Empty() const noexcept {
+    return Size() == 0;
+  }
 
  private:
   static constexpr size_t kMask = Capacity - 1;

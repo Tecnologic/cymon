@@ -13,8 +13,7 @@ static constexpr uint64_t kHeartbeatIntervalUs = 1000000u;  // 1 Hz
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
-CyphalNode::CyphalNode(CyphalTransport& transport, const NodeInfo& info)
-    : transport_(transport), info_(info) {
+CyphalNode::CyphalNode(CyphalTransport& transport, const NodeInfo& info) : transport_(transport), info_(info) {
   // Subscribe to GetInfo requests
   transport_.Subscribe(CanardTransferKindRequest, kGetInfoServiceId,
                        /*extent=*/0, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
@@ -93,7 +92,8 @@ void CyphalNode::HandleGetInfo(const CanardRxTransfer& transfer) {
   resp[offset++] = info_.sw_major;
   resp[offset++] = info_.sw_minor;
   // software_vcs_revision_id (uint64)
-  for (int i = 0; i < 8; ++i) resp[offset++] = 0;
+  for (int i = 0; i < 8; ++i)
+    resp[offset++] = 0;
   // unique_id (16 bytes)
   std::memcpy(resp + offset, info_.unique_id, 16);
   offset += 16;

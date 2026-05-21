@@ -26,7 +26,7 @@ class Mcp2518fd {
     int spi_miso{13};
     int spi_sck{12};
     int spi_cs{10};
-    int int_pin{9};   ///< active-low interrupt
+    int int_pin{9};    ///< active-low interrupt
     int stby_pin{-1};  ///< optional standby pin (-1 = not connected)
   };
 
@@ -59,7 +59,9 @@ class Mcp2518fd {
   size_t Receive(CanFrame* out, size_t max_frames);
 
   /// Register a callback invoked from the RX task for each received frame.
-  void SetRxCallback(CanRxCallback cb) { rx_callback_ = std::move(cb); }
+  void SetRxCallback(CanRxCallback cb) {
+    rx_callback_ = std::move(cb);
+  }
 
   /// FreeRTOS task body — call from a pinned high-priority task on core 1.
   void RxTask();

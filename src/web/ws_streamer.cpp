@@ -54,7 +54,8 @@ static uint8_t* WriteFloat32(uint8_t* p, float v) {
 
 static uint8_t* WriteFixStr(uint8_t* p, const char* s, uint8_t len) {
   *p++ = static_cast<uint8_t>(0xA0u | (len & 0x1Fu));
-  for (uint8_t i = 0; i < len; ++i) *p++ = static_cast<uint8_t>(s[i]);
+  for (uint8_t i = 0; i < len; ++i)
+    *p++ = static_cast<uint8_t>(s[i]);
   return p;
 }
 
@@ -112,8 +113,9 @@ size_t WsStreamer::Serialise(const GraphDataResponse& resp, uint8_t* out, size_t
   uint8_t* p = out;
   uint8_t* const end = out + max_len;
 
-#define CHECK(n) \
-  if ((p + (n)) > end) return 0
+#define CHECK(n)       \
+  if ((p + (n)) > end) \
+  return 0
 
   // Top-level fixmap: {"s":…,"n":…,"ch":[…]}
   CHECK(1);

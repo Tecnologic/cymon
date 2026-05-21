@@ -39,7 +39,9 @@ struct NodeRecord {
   std::vector<VariableInfo> variables{};
   std::vector<SubjectInfo> subjects{};
 
-  [[nodiscard]] bool IsOnline() const { return health != NodeHealth::kOffline; }
+  [[nodiscard]] bool IsOnline() const {
+    return health != NodeHealth::kOffline;
+  }
 };
 
 }  // namespace cymon

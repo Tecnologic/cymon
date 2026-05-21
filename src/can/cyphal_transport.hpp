@@ -1,9 +1,10 @@
 #pragma once
 
 #include <canard.h>
+#include <o1heap.h>
+
 #include <cstdint>
 #include <functional>
-#include <o1heap.h>
 
 #include "transport/can_frame.hpp"
 
@@ -30,16 +31,14 @@ class CyphalTransport {
 
   /// Subscribe to a subject or service.
   /// @return CanardRxSubscription* (owned by the transport), or nullptr on OOM.
-  CanardRxSubscription* Subscribe(CanardTransferKind kind, CanardPortID port_id,
-                                  size_t extent, CanardMicrosecond transfer_id_timeout_us);
+  CanardRxSubscription* Subscribe(CanardTransferKind kind, CanardPortID port_id, size_t extent, CanardMicrosecond transfer_id_timeout_us);
 
   /// Unsubscribe.
   bool Unsubscribe(CanardTransferKind kind, CanardPortID port_id);
 
   /// Queue a transfer for transmission.
   /// @return number of frames enqueued (≥0), or <0 on error.
-  int32_t Transmit(const CanardTransferMetadata& meta, size_t payload_size,
-                   const void* payload);
+  int32_t Transmit(const CanardTransferMetadata& meta, size_t payload_size, const void* payload);
 
   /// Feed a received raw CAN-FD frame into the Cyphal receive logic.
   /// Invokes rx_callback_ for completed transfers.
@@ -51,9 +50,13 @@ class CyphalTransport {
   void Drain(const SendFn& send_fn, CanardMicrosecond now_us);
 
   /// Register a callback for received transfers.
-  void SetRxCallback(CyphalRxCallback cb) { rx_callback_ = std::move(cb); }
+  void SetRxCallback(CyphalRxCallback cb) {
+    rx_callback_ = std::move(cb);
+  }
 
-  [[nodiscard]] uint8_t NodeId() const { return static_cast<uint8_t>(canard_.node_id); }
+  [[nodiscard]] uint8_t NodeId() const {
+    return static_cast<uint8_t>(canard_.node_id);
+  }
 
   /// Allocator stats (for diagnostics)
   [[nodiscard]] O1HeapDiagnostics HeapDiagnostics() const {

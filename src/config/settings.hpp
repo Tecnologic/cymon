@@ -22,8 +22,12 @@ class NvsSettings {
   esp_err_t Save();
 
   /// Access the in-memory settings (modifiable).
-  [[nodiscard]] Settings& Get() { return settings_; }
-  [[nodiscard]] const Settings& Get() const { return settings_; }
+  [[nodiscard]] Settings& Get() {
+    return settings_;
+  }
+  [[nodiscard]] const Settings& Get() const {
+    return settings_;
+  }
 
   /// Reset settings to compile-time defaults and save.
   esp_err_t ResetToDefaults();

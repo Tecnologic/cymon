@@ -32,7 +32,7 @@
     {
       "label": "cmake: configure",
       "type": "shell",
-      "command": "cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+      "command": "cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S host",
       "group": "none",
       "presentation": { "reveal": "always" }
     },

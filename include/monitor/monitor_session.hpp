@@ -79,7 +79,9 @@ class MonitorSession {
   void ConfigureTrigger(const TriggerConfig& cfg) noexcept;
 
   /// Set operating mode.
-  void SetMode(SessionMode mode) noexcept { mode_ = mode; }
+  void SetMode(SessionMode mode) noexcept {
+    mode_ = mode;
+  }
 
   /// Feed one sample.  If the channel is not registered this is a no-op.
   void FeedSample(uint8_t node_id, uint8_t variable_id, uint64_t timestamp_us, float value) noexcept;
@@ -87,12 +89,20 @@ class MonitorSession {
   /// Populate @p response with a snapshot of all channel data.
   void GetGraphData(GraphDataResponse& response) const noexcept;
 
-  [[nodiscard]] uint8_t Id() const noexcept { return session_id_; }
-  [[nodiscard]] SessionMode Mode() const noexcept { return mode_; }
-  [[nodiscard]] uint8_t NumChannels() const noexcept { return static_cast<uint8_t>(num_channels_); }
+  [[nodiscard]] uint8_t Id() const noexcept {
+    return session_id_;
+  }
+  [[nodiscard]] SessionMode Mode() const noexcept {
+    return mode_;
+  }
+  [[nodiscard]] uint8_t NumChannels() const noexcept {
+    return static_cast<uint8_t>(num_channels_);
+  }
 
   /// True if the session is "armed" and waiting for or capturing a trigger.
-  [[nodiscard]] bool IsArmed() const noexcept { return armed_; }
+  [[nodiscard]] bool IsArmed() const noexcept {
+    return armed_;
+  }
 
   /// Arm the trigger (only meaningful in kTriggered mode).
   void Arm() noexcept {
@@ -102,7 +112,9 @@ class MonitorSession {
   }
 
   /// Disarm without freezing.
-  void Disarm() noexcept { armed_ = false; }
+  void Disarm() noexcept {
+    armed_ = false;
+  }
 
  private:
   uint8_t session_id_{0};

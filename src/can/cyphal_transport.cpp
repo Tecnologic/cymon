@@ -55,9 +55,8 @@ CyphalTransport::~CyphalTransport() {
 // ---------------------------------------------------------------------------
 // Subscribe
 // ---------------------------------------------------------------------------
-CanardRxSubscription* CyphalTransport::Subscribe(CanardTransferKind kind, CanardPortID port_id,
-                                                  size_t extent,
-                                                  CanardMicrosecond transfer_id_timeout_us) {
+CanardRxSubscription* CyphalTransport::Subscribe(CanardTransferKind kind, CanardPortID port_id, size_t extent,
+                                                 CanardMicrosecond transfer_id_timeout_us) {
   auto* sub = static_cast<CanardRxSubscription*>(o1heapAllocate(heap_, sizeof(CanardRxSubscription)));
   if (sub == nullptr) {
     CYMON_LOGE(kTag, "OOM subscribing port %u", port_id);
@@ -81,8 +80,7 @@ bool CyphalTransport::Unsubscribe(CanardTransferKind kind, CanardPortID port_id)
 // ---------------------------------------------------------------------------
 // Transmit
 // ---------------------------------------------------------------------------
-int32_t CyphalTransport::Transmit(const CanardTransferMetadata& meta, size_t payload_size,
-                                  const void* payload) {
+int32_t CyphalTransport::Transmit(const CanardTransferMetadata& meta, size_t payload_size, const void* payload) {
   const CanardMicrosecond deadline = static_cast<CanardMicrosecond>(esp_timer_get_time()) + 100000u;
   const int32_t result = canardTxPush(&tx_queue_, &canard_, deadline, &meta, payload_size, payload);
   if (result < 0) {
@@ -103,8 +101,7 @@ void CyphalTransport::Push(const CanFrame& frame) {
   CanardRxTransfer transfer{};
   CanardRxSubscription* sub = nullptr;
 
-  const int8_t result = canardRxAccept(&canard_, static_cast<CanardMicrosecond>(frame.timestamp_us),
-                                       &cf, 0, &transfer, &sub);
+  const int8_t result = canardRxAccept(&canard_, static_cast<CanardMicrosecond>(frame.timestamp_us), &cf, 0, &transfer, &sub);
   if (result == 1) {
     if (rx_callback_) {
       rx_callback_(transfer);

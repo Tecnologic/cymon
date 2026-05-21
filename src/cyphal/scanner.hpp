@@ -22,7 +22,9 @@ class NetworkScanner {
   void Tick(uint64_t now_us);
 
   /// Read-only access to node table.
-  [[nodiscard]] const std::map<uint8_t, NodeRecord>& Nodes() const { return nodes_; }
+  [[nodiscard]] const std::map<uint8_t, NodeRecord>& Nodes() const {
+    return nodes_;
+  }
 
  private:
   void HandleHeartbeat(const CanardRxTransfer& transfer);

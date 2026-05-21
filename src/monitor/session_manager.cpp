@@ -7,8 +7,7 @@ namespace cymon {
 // ---------------------------------------------------------------------------
 // CreateSession
 // ---------------------------------------------------------------------------
-uint8_t SessionManager::CreateSession(std::span<const ChannelConfig> channels, SessionMode mode,
-                                      const TriggerConfig* trigger) noexcept {
+uint8_t SessionManager::CreateSession(std::span<const ChannelConfig> channels, SessionMode mode, const TriggerConfig* trigger) noexcept {
   for (size_t i = 0; i < kMaxConcurrentSessions; ++i) {
     if (!sessions_[i]) {
       const uint8_t id = next_id_++;
@@ -43,8 +42,7 @@ bool SessionManager::DestroySession(uint8_t session_id) noexcept {
 // ---------------------------------------------------------------------------
 // FeedSample
 // ---------------------------------------------------------------------------
-void SessionManager::FeedSample(uint8_t node_id, uint8_t variable_id, uint64_t timestamp_us,
-                                float value) noexcept {
+void SessionManager::FeedSample(uint8_t node_id, uint8_t variable_id, uint64_t timestamp_us, float value) noexcept {
   for (auto& session : sessions_) {
     if (session) {
       session->FeedSample(node_id, variable_id, timestamp_us, value);

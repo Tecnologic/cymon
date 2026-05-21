@@ -12,14 +12,12 @@ static constexpr const char* kTag = "CYMON.ALLOC";
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
-PnpAllocator::PnpAllocator(CyphalTransport& transport)
-    : transport_(transport), startup_us_(static_cast<uint64_t>(esp_timer_get_time())) {
+PnpAllocator::PnpAllocator(CyphalTransport& transport) : transport_(transport), startup_us_(static_cast<uint64_t>(esp_timer_get_time())) {
   transport_.Subscribe(CanardTransferKindMessage, kPnpSubjectId,
                        /*extent=*/19, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
   transport_.SetRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindMessage &&
-        t.metadata.port_id == kPnpSubjectId) {
+    if (t.metadata.transfer_kind == CanardTransferKindMessage && t.metadata.port_id == kPnpSubjectId) {
       HandleAllocationData(t);
     }
   });

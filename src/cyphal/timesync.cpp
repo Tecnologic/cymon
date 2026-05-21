@@ -11,14 +11,12 @@ static constexpr const char* kTag = "CYMON.TIME";
 // Constructor
 // ---------------------------------------------------------------------------
 TimeSyncProvider::TimeSyncProvider(CyphalTransport& transport)
-    : transport_(transport),
-      last_master_seen_us_(static_cast<uint64_t>(esp_timer_get_time())) {
+    : transport_(transport), last_master_seen_us_(static_cast<uint64_t>(esp_timer_get_time())) {
   transport_.Subscribe(CanardTransferKindMessage, kTimeSyncSubjectId,
                        /*extent=*/7, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
   transport_.SetRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindMessage &&
-        t.metadata.port_id == kTimeSyncSubjectId) {
+    if (t.metadata.transfer_kind == CanardTransferKindMessage && t.metadata.port_id == kTimeSyncSubjectId) {
       HandleTimeSync(t);
     }
   });

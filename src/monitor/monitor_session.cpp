@@ -28,13 +28,14 @@ void MonitorSession::ConfigureChannels(std::span<const ChannelConfig> configs) n
 // ---------------------------------------------------------------------------
 // ConfigureTrigger
 // ---------------------------------------------------------------------------
-void MonitorSession::ConfigureTrigger(const TriggerConfig& cfg) noexcept { trigger_cfg_ = cfg; }
+void MonitorSession::ConfigureTrigger(const TriggerConfig& cfg) noexcept {
+  trigger_cfg_ = cfg;
+}
 
 // ---------------------------------------------------------------------------
 // FeedSample
 // ---------------------------------------------------------------------------
-void MonitorSession::FeedSample(uint8_t node_id, uint8_t variable_id, uint64_t timestamp_us,
-                                float value) noexcept {
+void MonitorSession::FeedSample(uint8_t node_id, uint8_t variable_id, uint64_t timestamp_us, float value) noexcept {
   const int idx = FindChannel(node_id, variable_id);
   if (idx < 0) {
     return;
@@ -97,8 +98,7 @@ int MonitorSession::FindChannel(uint8_t node_id, uint8_t variable_id) const noex
 // ---------------------------------------------------------------------------
 // CheckTrigger
 // ---------------------------------------------------------------------------
-void MonitorSession::CheckTrigger(size_t ch_index, float prev, float current,
-                                  uint64_t /*timestamp_us*/) noexcept {
+void MonitorSession::CheckTrigger(size_t ch_index, float prev, float current, uint64_t /*timestamp_us*/) noexcept {
   if (ch_index != trigger_cfg_.channel_index) {
     return;
   }

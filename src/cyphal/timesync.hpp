@@ -15,14 +15,16 @@ namespace cymon {
 class TimeSyncProvider {
  public:
   static constexpr CanardPortID kTimeSyncSubjectId = 7510u;
-  static constexpr uint64_t kMasterTimeoutUs = 5000000u;  // 5 s
+  static constexpr uint64_t kMasterTimeoutUs = 5000000u;    // 5 s
   static constexpr uint64_t kPublishIntervalUs = 1000000u;  // 1 Hz
 
   explicit TimeSyncProvider(CyphalTransport& transport);
 
   void Tick(uint64_t now_us);
 
-  [[nodiscard]] bool IsMaster() const { return is_master_; }
+  [[nodiscard]] bool IsMaster() const {
+    return is_master_;
+  }
 
  private:
   void HandleTimeSync(const CanardRxTransfer& transfer);

@@ -16,10 +16,11 @@ static constexpr const char* kTag = "CYMON.WIFI";
 // ---------------------------------------------------------------------------
 // Constructor / Destructor
 // ---------------------------------------------------------------------------
-WifiManager::WifiManager(ConnectedCallback on_state_change)
-    : on_state_change_(std::move(on_state_change)) {}
+WifiManager::WifiManager(ConnectedCallback on_state_change) : on_state_change_(std::move(on_state_change)) {}
 
-WifiManager::~WifiManager() { esp_wifi_stop(); }
+WifiManager::~WifiManager() {
+  esp_wifi_stop();
+}
 
 // ---------------------------------------------------------------------------
 // Init
@@ -42,8 +43,7 @@ void WifiManager::Init(std::string_view ssid, std::string_view password) {
 
   wifi_config_t wifi_cfg{};
   std::strncpy(reinterpret_cast<char*>(wifi_cfg.sta.ssid), ssid_, sizeof(wifi_cfg.sta.ssid) - 1);
-  std::strncpy(reinterpret_cast<char*>(wifi_cfg.sta.password), password_,
-               sizeof(wifi_cfg.sta.password) - 1);
+  std::strncpy(reinterpret_cast<char*>(wifi_cfg.sta.password), password_, sizeof(wifi_cfg.sta.password) - 1);
   wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
 
   ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
@@ -64,8 +64,7 @@ void WifiManager::Reconnect(std::string_view ssid, std::string_view password) {
 
   wifi_config_t wifi_cfg{};
   std::strncpy(reinterpret_cast<char*>(wifi_cfg.sta.ssid), ssid_, sizeof(wifi_cfg.sta.ssid) - 1);
-  std::strncpy(reinterpret_cast<char*>(wifi_cfg.sta.password), password_,
-               sizeof(wifi_cfg.sta.password) - 1);
+  std::strncpy(reinterpret_cast<char*>(wifi_cfg.sta.password), password_, sizeof(wifi_cfg.sta.password) - 1);
   wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
   esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
   esp_wifi_connect();
@@ -83,8 +82,7 @@ void WifiManager::StartAp() {
 
   wifi_config_t ap_cfg{};
   std::strncpy(reinterpret_cast<char*>(ap_cfg.ap.ssid), kApSsid, sizeof(ap_cfg.ap.ssid) - 1);
-  std::strncpy(reinterpret_cast<char*>(ap_cfg.ap.password), kApPassword,
-               sizeof(ap_cfg.ap.password) - 1);
+  std::strncpy(reinterpret_cast<char*>(ap_cfg.ap.password), kApPassword, sizeof(ap_cfg.ap.password) - 1);
   ap_cfg.ap.max_connection = 4;
   ap_cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
   ap_cfg.ap.ssid_len = static_cast<uint8_t>(std::strlen(kApSsid));

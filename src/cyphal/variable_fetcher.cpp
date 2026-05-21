@@ -11,14 +11,12 @@ static constexpr uint64_t kRequestTimeoutUs = 500000u;  // 500 ms
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
-VariableFetcher::VariableFetcher(CyphalTransport& transport, DoneCallback on_done)
-    : transport_(transport), on_done_(std::move(on_done)) {
+VariableFetcher::VariableFetcher(CyphalTransport& transport, DoneCallback on_done) : transport_(transport), on_done_(std::move(on_done)) {
   transport_.Subscribe(CanardTransferKindResponse, kGetVariableListServiceId,
                        /*extent=*/512, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
   transport_.SetRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindResponse &&
-        t.metadata.port_id == kGetVariableListServiceId) {
+    if (t.metadata.transfer_kind == CanardTransferKindResponse && t.metadata.port_id == kGetVariableListServiceId) {
       HandleResponse(t);
     }
   });
@@ -76,25 +74,31 @@ void VariableFetcher::HandleResponse(const CanardRxTransfer& transfer) {
 
   if (p >= end) {
     CYMON_LOGW(kTag, "Empty variable list response from node %u", node_id);
-    if (on_done_) on_done_(node_id, vars);
+    if (on_done_)
+      on_done_(node_id, vars);
     return;
   }
 
   const uint8_t count = *p++;
   for (uint8_t i = 0; i < count && p < end; ++i) {
-    if (p + 2 > end) break;
+    if (p + 2 > end)
+      break;
     const uint16_t var_id = static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
     p += 2;
 
-    if (p >= end) break;
+    if (p >= end)
+      break;
     const uint8_t name_len = *p++;
-    if (p + name_len > end) break;
+    if (p + name_len > end)
+      break;
     std::string name(reinterpret_cast<const char*>(p), name_len);
     p += name_len;
 
-    if (p >= end) break;
+    if (p >= end)
+      break;
     const uint8_t unit_len = *p++;
-    if (p + unit_len > end) break;
+    if (p + unit_len > end)
+      break;
     std::string unit(reinterpret_cast<const char*>(p), unit_len);
     p += unit_len;
 
