@@ -21,7 +21,7 @@ class WebServer;
 ///       "nid": uint8,
 ///       "vid": uint8,
 ///       "t":  [uint64, ...]   -- timestamp_us array
-///       "v":  [float32, ...]  -- value array (packed as bin8/bin16)
+///       "v":  [float32, ...]  -- value array (MessagePack float32 / 0xCA)
 ///     }, ...
 ///   ]
 /// }

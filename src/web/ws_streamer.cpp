@@ -1,5 +1,8 @@
 #include "web/ws_streamer.hpp"
 
+#include <cassert>
+#include <string_view>
+
 #include "logging/logger.hpp"
 #include "web/web_server.hpp"
 
@@ -8,72 +11,109 @@ namespace cymon {
 static constexpr const char* kTag = "CYMON.WS";
 
 // ---------------------------------------------------------------------------
-// Minimal MessagePack encoder (subset: fixmap, fixarray, fixstr, uint8,
-// uint16, uint32, uint64, float32, bin8, bin16)
+// Bounds-safe MessagePack encoder
+//
+// BufWriter tracks a write pointer and an end pointer.  Every Put() call
+// checks for overflow before writing; once overflow is detected the writer
+// enters a failed state and all subsequent writes are no-ops.  Call ok()
+// and size() after all writes to retrieve the result.
 // ---------------------------------------------------------------------------
 namespace msgpack {
 
-static uint8_t* WriteUint8(uint8_t* p, uint8_t v) {
-  if (v <= 0x7Fu) {
-    *p++ = v;
-  } else {
-    *p++ = 0xCCu;
-    *p++ = v;
+class BufWriter {
+ public:
+  BufWriter(uint8_t* buf, size_t cap) noexcept : begin_(buf), p_(buf), end_(buf + cap) {
+    // buf must be non-null; cap==0 is valid (any write will set ok_=false)
+    assert(buf != nullptr);
   }
-  return p;
-}
 
-static uint8_t* WriteUint32(uint8_t* p, uint32_t v) {
-  *p++ = 0xCEu;
-  *p++ = static_cast<uint8_t>((v >> 24) & 0xFFu);
-  *p++ = static_cast<uint8_t>((v >> 16) & 0xFFu);
-  *p++ = static_cast<uint8_t>((v >> 8) & 0xFFu);
-  *p++ = static_cast<uint8_t>(v & 0xFFu);
-  return p;
-}
-
-static uint8_t* WriteUint64(uint8_t* p, uint64_t v) {
-  *p++ = 0xCFu;
-  for (int i = 7; i >= 0; --i) {
-    *p++ = static_cast<uint8_t>((v >> (8 * i)) & 0xFFu);
+  [[nodiscard]] bool ok() const noexcept {
+    return ok_;
   }
-  return p;
-}
-
-static uint8_t* WriteFloat32(uint8_t* p, float v) {
-  *p++ = 0xCAu;
-  uint32_t bits;
-  static_assert(sizeof(bits) == sizeof(v));
-  __builtin_memcpy(&bits, &v, 4);
-  *p++ = static_cast<uint8_t>((bits >> 24) & 0xFFu);
-  *p++ = static_cast<uint8_t>((bits >> 16) & 0xFFu);
-  *p++ = static_cast<uint8_t>((bits >> 8) & 0xFFu);
-  *p++ = static_cast<uint8_t>(bits & 0xFFu);
-  return p;
-}
-
-static uint8_t* WriteFixStr(uint8_t* p, const char* s, uint8_t len) {
-  *p++ = static_cast<uint8_t>(0xA0u | (len & 0x1Fu));
-  for (uint8_t i = 0; i < len; ++i)
-    *p++ = static_cast<uint8_t>(s[i]);
-  return p;
-}
-
-static uint8_t* WriteFixMap(uint8_t* p, uint8_t n) {
-  *p++ = static_cast<uint8_t>(0x80u | (n & 0x0Fu));
-  return p;
-}
-
-static uint8_t* WriteFixArray(uint8_t* p, uint16_t n) {
-  if (n <= 15) {
-    *p++ = static_cast<uint8_t>(0x90u | (n & 0x0Fu));
-  } else {
-    *p++ = 0xDCu;
-    *p++ = static_cast<uint8_t>((n >> 8) & 0xFFu);
-    *p++ = static_cast<uint8_t>(n & 0xFFu);
+  [[nodiscard]] size_t size() const noexcept {
+    return ok_ ? static_cast<size_t>(p_ - begin_) : 0u;
   }
-  return p;
-}
+
+  /// fixmap — up to 15 pairs
+  void FixMap(uint8_t n) {
+    Put(static_cast<uint8_t>(0x80u | (n & 0x0Fu)));
+  }
+
+  /// fixarray (n ≤ 15) or array16 (n ≤ 65535)
+  void FixArray(uint16_t n) {
+    if (n <= 15u) {
+      Put(static_cast<uint8_t>(0x90u | (n & 0x0Fu)));
+    } else {
+      Put(0xDCu);
+      Put(static_cast<uint8_t>((n >> 8) & 0xFFu));
+      Put(static_cast<uint8_t>(n & 0xFFu));
+    }
+  }
+
+  /// fixstr — fails the writer if the string length exceeds 31 bytes
+  void FixStr(std::string_view s) {
+    if (s.size() > 31u) {
+      ok_ = false;
+      assert(false && "FixStr: string length exceeds fixstr limit (31 bytes)");
+      return;
+    }
+    Put(static_cast<uint8_t>(0xA0u | (s.size() & 0x1Fu)));
+    for (char c : s)
+      Put(static_cast<uint8_t>(c));
+  }
+
+  /// positive fixint (0–127) or uint8 (0xCC prefix) for larger values
+  void Uint8(uint8_t v) {
+    if (v <= 0x7Fu) {
+      Put(v);
+    } else {
+      Put(0xCCu);
+      Put(v);
+    }
+  }
+
+  /// uint32 (always 5-byte form)
+  void Uint32(uint32_t v) {
+    Put(0xCEu);
+    Put(static_cast<uint8_t>((v >> 24) & 0xFFu));
+    Put(static_cast<uint8_t>((v >> 16) & 0xFFu));
+    Put(static_cast<uint8_t>((v >> 8) & 0xFFu));
+    Put(static_cast<uint8_t>(v & 0xFFu));
+  }
+
+  /// uint64 (always 9-byte form)
+  void Uint64(uint64_t v) {
+    Put(0xCFu);
+    for (int i = 7; i >= 0; --i)
+      Put(static_cast<uint8_t>((v >> (8 * i)) & 0xFFu));
+  }
+
+  /// float32 (always 5-byte form, IEEE-754 big-endian)
+  void Float32(float v) {
+    Put(0xCAu);
+    uint32_t bits;
+    static_assert(sizeof(bits) == sizeof(v));
+    __builtin_memcpy(&bits, &v, sizeof(bits));
+    Put(static_cast<uint8_t>((bits >> 24) & 0xFFu));
+    Put(static_cast<uint8_t>((bits >> 16) & 0xFFu));
+    Put(static_cast<uint8_t>((bits >> 8) & 0xFFu));
+    Put(static_cast<uint8_t>(bits & 0xFFu));
+  }
+
+ private:
+  void Put(uint8_t b) noexcept {
+    if (!ok_ || p_ >= end_) {
+      ok_ = false;
+      return;
+    }
+    *p_++ = b;
+  }
+
+  uint8_t* const begin_;
+  uint8_t* p_;
+  uint8_t* const end_;
+  bool ok_{true};
+};
 
 }  // namespace msgpack
 
@@ -110,71 +150,46 @@ void WsStreamer::Tick(uint64_t now_us) {
 // Serialise  — produces MessagePack binary in @p out
 // ---------------------------------------------------------------------------
 size_t WsStreamer::Serialise(const GraphDataResponse& resp, uint8_t* out, size_t max_len) {
-  uint8_t* p = out;
-  uint8_t* const end = out + max_len;
-
-#define CHECK(n)       \
-  if ((p + (n)) > end) \
-  return 0
+  msgpack::BufWriter w{out, max_len};
 
   // Top-level fixmap: {"s":…,"n":…,"ch":[…]}
-  CHECK(1);
-  p = msgpack::WriteFixMap(p, 3);
-
-  CHECK(2);
-  p = msgpack::WriteFixStr(p, "s", 1);
-  CHECK(2);
-  p = msgpack::WriteUint8(p, resp.session_id);
-
-  CHECK(2);
-  p = msgpack::WriteFixStr(p, "n", 1);
-  CHECK(2);
-  p = msgpack::WriteUint8(p, resp.num_channels);
-
-  CHECK(3);
-  p = msgpack::WriteFixStr(p, "ch", 2);
-  CHECK(3);
-  p = msgpack::WriteFixArray(p, resp.num_channels);
+  w.FixMap(3);
+  w.FixStr("s");
+  w.Uint8(resp.session_id);
+  w.FixStr("n");
+  w.Uint8(resp.num_channels);
+  w.FixStr("ch");
+  w.FixArray(resp.num_channels);
 
   for (uint8_t ch = 0; ch < resp.num_channels; ++ch) {
     const ChannelSnapshot& snap = resp.channels[ch];
 
     // Per-channel fixmap: {"nid":…,"vid":…,"t":[…],"v":[…]}
-    CHECK(1);
-    p = msgpack::WriteFixMap(p, 4);
+    w.FixMap(4);
+    w.FixStr("nid");
+    w.Uint8(snap.key.node_id);
+    w.FixStr("vid");
+    w.Uint8(snap.key.variable_id);
 
-    CHECK(5);
-    p = msgpack::WriteFixStr(p, "nid", 3);
-    p = msgpack::WriteUint8(p, snap.key.node_id);
-
-    CHECK(5);
-    p = msgpack::WriteFixStr(p, "vid", 3);
-    p = msgpack::WriteUint8(p, snap.key.variable_id);
-
-    // Timestamps
-    CHECK(2);
-    p = msgpack::WriteFixStr(p, "t", 1);
-    CHECK(3);
-    p = msgpack::WriteFixArray(p, static_cast<uint16_t>(snap.count));
+    // Timestamps — array of uint64
+    w.FixStr("t");
+    w.FixArray(static_cast<uint16_t>(snap.count));
     for (size_t i = 0; i < snap.count; ++i) {
-      CHECK(9);
-      p = msgpack::WriteUint64(p, snap.samples[i].timestamp_us);
+      w.Uint64(snap.samples[i].timestamp_us);
     }
 
-    // Values — packed as array of float32
-    CHECK(2);
-    p = msgpack::WriteFixStr(p, "v", 1);
-    CHECK(3);
-    p = msgpack::WriteFixArray(p, static_cast<uint16_t>(snap.count));
+    // Values — array of float32
+    w.FixStr("v");
+    w.FixArray(static_cast<uint16_t>(snap.count));
     for (size_t i = 0; i < snap.count; ++i) {
-      CHECK(5);
-      p = msgpack::WriteFloat32(p, snap.samples[i].value);
+      w.Float32(snap.samples[i].value);
     }
   }
 
-#undef CHECK
-
-  return static_cast<size_t>(p - out);
+  if (!w.ok()) {
+    CYMON_LOGW(kTag, "WS frame truncated: scratch buffer too small");
+  }
+  return w.size();
 }
 
 }  // namespace cymon
