@@ -1,0 +1,124 @@
+#include "cyphal/subject_scanner.hpp"
+
+#include <cstring>
+
+#include "esp_timer.h"
+#include "logging/logger.hpp"
+
+namespace cymon {
+
+static constexpr const char* kTag = "CYMON.SUBSC";
+static constexpr uint64_t kRequestTimeoutUs = 500000u;
+
+// Cyphal register name prefix for subject IDs: "uavcan.pub.<name>.id"
+static constexpr std::string_view kPubPrefix = "uavcan.pub.";
+
+// ---------------------------------------------------------------------------
+// Constructor
+// ---------------------------------------------------------------------------
+SubjectScanner::SubjectScanner(CyphalTransport& transport, DoneCallback on_done) : transport_(transport), on_done_(std::move(on_done)) {
+  transport_.SubscribeResponse(&sub_response_, kRegisterListServiceId,
+                               /*extent=*/261, &CyphalTransport::kDispatchVtable);
+
+  transport_.AddRxCallback([this](const CyphalTransfer& t) {
+    if (t.kind == canard_kind_response && t.port_id == kRegisterListServiceId) {
+      HandleResponse(t);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ScanNode
+// ---------------------------------------------------------------------------
+void SubjectScanner::ScanNode(uint8_t node_id) {
+  if (pending_node_id_ != CANARD_NODE_ID_ANONYMOUS) {
+    return;
+  }
+  pending_node_id_ = node_id;
+  next_index_ = 0;
+  accumulated_.clear();
+  RequestNextPage();
+}
+
+// ---------------------------------------------------------------------------
+// RequestNextPage  (uavcan.register.List.1.0 request)
+// ---------------------------------------------------------------------------
+void SubjectScanner::RequestNextPage() {
+  request_deadline_us_ = static_cast<uint64_t>(esp_timer_get_time()) + kRequestTimeoutUs;
+
+  // uavcan.register.List.1.0 request: uint16 index
+  uint8_t payload[2];
+  payload[0] = static_cast<uint8_t>(next_index_ & 0xFFu);
+  payload[1] = static_cast<uint8_t>((next_index_ >> 8) & 0xFFu);
+
+  const canard_us_t deadline = static_cast<canard_us_t>(esp_timer_get_time()) + static_cast<canard_us_t>(kRequestTimeoutUs);
+  transport_.Request(deadline, canard_prio_nominal, kRegisterListServiceId, pending_node_id_, transfer_id_++, payload, sizeof(payload));
+  transport_.Poll();
+}
+
+// ---------------------------------------------------------------------------
+// Tick
+// ---------------------------------------------------------------------------
+void SubjectScanner::Tick(uint64_t now_us) {
+  if (pending_node_id_ != CANARD_NODE_ID_ANONYMOUS && now_us > request_deadline_us_) {
+    CYMON_LOGW(kTag, "register.List page %u from node %u timed out", next_index_, pending_node_id_);
+    if (on_done_)
+      on_done_(pending_node_id_, accumulated_);
+    pending_node_id_ = CANARD_NODE_ID_ANONYMOUS;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HandleResponse  (uavcan.register.List.1.0 response)
+// ---------------------------------------------------------------------------
+void SubjectScanner::HandleResponse(const CyphalTransfer& t) {
+  const uint8_t node_id = t.source_node_id;
+  if (node_id != pending_node_id_) {
+    return;
+  }
+
+  // Response: variable-length string (register name), max 255 bytes
+  // An empty name signals end of register list.
+  const auto* p = static_cast<const uint8_t*>(t.payload);
+  if (t.payload_size < 1) {
+    goto done;
+  }
+
+  {
+    const uint8_t name_len = *p++;
+    if (name_len == 0) {
+      goto done;  // end of list
+    }
+    if (static_cast<size_t>(name_len) > t.payload_size - 1) {
+      goto done;
+    }
+    std::string reg_name(reinterpret_cast<const char*>(p), name_len);
+
+    // Filter: keep only "uavcan.pub.<name>.id" registers
+    if (reg_name.starts_with(kPubPrefix)) {
+      SubjectInfo si{};
+      const size_t start = kPubPrefix.size();
+      const size_t end_pos = reg_name.rfind(".id");
+      if (end_pos != std::string::npos && end_pos > start) {
+        si.data_type = reg_name.substr(start, end_pos - start);
+      } else {
+        si.data_type = reg_name;
+      }
+      si.subject_id = 0xFFFFu;  // filled in when register.Access resolves the value
+      accumulated_.push_back(si);
+    }
+
+    ++next_index_;
+    RequestNextPage();
+    return;
+  }
+
+done:
+  CYMON_LOGI(kTag, "Subject scan done for node %u: %zu subjects", node_id, accumulated_.size());
+  if (on_done_) {
+    on_done_(node_id, accumulated_);
+  }
+  pending_node_id_ = CANARD_NODE_ID_ANONYMOUS;
+}
+
+}  // namespace cymon

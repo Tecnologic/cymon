@@ -1,0 +1,54 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "pio: build",
+      "type": "shell",
+      "command": "pio run --environment esp32s2mini",
+      "group": "build",
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "pio: upload",
+      "type": "shell",
+      "command": "pio run --environment esp32s2mini --target upload",
+      "group": "none",
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "pio: monitor",
+      "type": "shell",
+      "command": "pio device monitor --baud 115200",
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "pio: uploadfs",
+      "type": "shell",
+      "command": "pio run --environment esp32s2mini --target uploadfs",
+      "group": "none",
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "cmake: configure",
+      "type": "shell",
+      "command": "cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S host",
+      "group": "none",
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "cmake: build",
+      "type": "shell",
+      "command": "cmake --build build",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "ctest: run",
+      "type": "shell",
+      "command": "ctest --test-dir build --output-on-failure",
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always" }
+    }
+  ]
+}

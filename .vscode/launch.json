@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ESP32-S2 OpenOCD (USB-JTAG)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/.pio/build/esp32s2mini/firmware.elf",
+      "MIMode": "gdb",
+      "miDebuggerPath": "${env:HOME}/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s2-elf-gdb",
+      "miDebuggerServerAddress": "localhost:3333",
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "serverStarted": "Info : Listening on port 3333 for gdb connections",
+      "serverLaunchTimeout": 10000,
+      "debugServerPath": "openocd",
+      "debugServerArgs": "-f board/esp32s2-builtin.cfg",
+      "preLaunchTask": "pio: build"
+    },
+    {
+      "name": "Host Tests (GDB)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/cymon_tests",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "cmake: build"
+    }
+  ]
+}

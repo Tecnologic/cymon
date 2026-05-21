@@ -1,0 +1,11 @@
+---
+BasedOnStyle: Google
+ColumnLimit: 140
+IndentWidth: 2
+ContinuationIndentWidth: 4
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+---

@@ -1,0 +1,42 @@
+{
+  "configurations": [
+    {
+      "name": "ESP32-S2 (Firmware)",
+      "compilerPath": "${env:HOME}/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s2-elf-g++",
+      "cppStandard": "c++20",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/lib/cymon-lib/include",
+        "${env:HOME}/.platformio/packages/toolchain-xtensa-esp-elf/xtensa-esp32s2-elf/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/freertos/FreeRTOS-Kernel/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/esp_common/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/esp_timer/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/driver/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/spi_flash/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/nvs_flash/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/esp_http_server/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/esp_wifi/include",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/lwip/include/apps",
+        "${env:HOME}/.platformio/packages/framework-espidf/components/lwip/lwip/src/include"
+      ],
+      "defines": [
+        "ESP_PLATFORM",
+        "CONFIG_IDF_TARGET_ESP32S2"
+      ],
+      "intelliSenseMode": "gcc-arm"
+    },
+    {
+      "name": "Linux (Host Tests)",
+      "compilerPath": "/usr/bin/clang++",
+      "cppStandard": "c++20",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/tests/stubs"
+      ],
+      "defines": [],
+      "intelliSenseMode": "clang-x64"
+    }
+  ],
+  "version": 4
+}

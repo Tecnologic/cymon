@@ -1,0 +1,20 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+  "clangd.arguments": [
+    "--compile-commands-dir=${workspaceFolder}/build",
+    "--background-index",
+    "--clang-tidy",
+    "--header-insertion=never"
+  ],
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+  "cmake.generator": "Ninja",
+  "platformio-ide.coreDirPath": "${env:HOME}/.platformio",
+  "files.associations": {
+    "*.hpp": "cpp",
+    "*.cpp": "cpp"
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+  }
+}
