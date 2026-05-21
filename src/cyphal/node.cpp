@@ -1,6 +1,8 @@
 #include "cyphal/node.hpp"
 
+#include <algorithm>
 #include <cstring>
+#include <string>
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -116,7 +118,7 @@ void CyphalNode::HandleGetInfo(const CanardRxTransfer& transfer) {
 // ---------------------------------------------------------------------------
 // HandleRegisterAccess
 // ---------------------------------------------------------------------------
-void CyphalNode::HandleRegisterAccess(const CanardRxTransfer& /*transfer*/) {
+void CyphalNode::HandleRegisterAccess(const CanardRxTransfer& transfer) {
   // Monitor does not expose registers — respond with empty (not present)
   uint8_t resp[2]{0x00, 0x00};
 
