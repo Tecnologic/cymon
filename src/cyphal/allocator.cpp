@@ -80,7 +80,7 @@ uint8_t PnpAllocator::AllocateNodeId(const uint8_t* unique_id_16) {
   }
 
   // Find a free ID, skipping the monitor's own node-ID and already-allocated IDs
-  while (next_dynamic_id_ < 127) {
+  while (next_dynamic_id_ <= 127) {
     if (next_dynamic_id_ == local_node_id_) {
       ++next_dynamic_id_;
       continue;

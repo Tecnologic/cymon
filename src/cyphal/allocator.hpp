@@ -40,7 +40,7 @@ class PnpAllocator {
   // unique_id (truncated to 8 bytes as key) → allocated node_id
   std::map<uint64_t, uint8_t> allocation_table_;
   uint8_t local_node_id_{127};  ///< Monitor's own node-ID; never handed out
-  uint8_t next_dynamic_id_{2};  ///< Next candidate ID to try (starts at 2, wraps before 127)
+  uint8_t next_dynamic_id_{2};  ///< Next candidate ID to try (range 2–127, skips local_node_id_)
 };
 
 }  // namespace cymon
