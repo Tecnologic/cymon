@@ -16,18 +16,16 @@ static constexpr uint64_t kHeartbeatIntervalUs = 1000000u;  // 1 Hz
 // Constructor
 // ---------------------------------------------------------------------------
 CyphalNode::CyphalNode(CyphalTransport& transport, const NodeInfo& info) : transport_(transport), info_(info) {
-  // Subscribe to GetInfo requests
-  transport_.Subscribe(CanardTransferKindRequest, kGetInfoServiceId,
-                       /*extent=*/0, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
-  // Subscribe to register.Access requests
-  transport_.Subscribe(CanardTransferKindRequest, kRegisterAccessServiceId,
-                       /*extent=*/264, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
+  transport_.SubscribeRequest(&sub_get_info_, kGetInfoServiceId,
+                              /*extent=*/0, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_us, &CyphalTransport::kDispatchVtable);
+  transport_.SubscribeRequest(&sub_reg_access_, kRegisterAccessServiceId,
+                              /*extent=*/264, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_us, &CyphalTransport::kDispatchVtable);
 
-  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindRequest) {
-      if (t.metadata.port_id == kGetInfoServiceId) {
+  transport_.AddRxCallback([this](const CyphalTransfer& t) {
+    if (t.kind == canard_kind_request) {
+      if (t.port_id == kGetInfoServiceId) {
         HandleGetInfo(t);
-      } else if (t.metadata.port_id == kRegisterAccessServiceId) {
+      } else if (t.port_id == kRegisterAccessServiceId) {
         HandleRegisterAccess(t);
       }
     }
@@ -55,32 +53,25 @@ void CyphalNode::PublishHeartbeat(uint64_t now_us) {
   //   health.value : uint2  (0=NOMINAL)
   //   mode.value   : uint3  (0=OPERATIONAL)
   //   vssc         : uint3  (vendor-specific status code)
-  // Total = 7 bytes
-
+  // Total = 5 bytes
   const uint32_t uptime_s = static_cast<uint32_t>(now_us / 1000000u);
 
-  uint8_t payload[7]{};
+  uint8_t payload[5]{};
   payload[0] = static_cast<uint8_t>(uptime_s & 0xFFu);
   payload[1] = static_cast<uint8_t>((uptime_s >> 8) & 0xFFu);
   payload[2] = static_cast<uint8_t>((uptime_s >> 16) & 0xFFu);
   payload[3] = static_cast<uint8_t>((uptime_s >> 24) & 0xFFu);
   payload[4] = 0u;  // health=NOMINAL, mode=OPERATIONAL, vssc=0
 
-  CanardTransferMetadata meta{};
-  meta.priority = CanardPrioritySlow;
-  meta.transfer_kind = CanardTransferKindMessage;
-  meta.port_id = kHeartbeatSubjectId;
-  meta.remote_node_id = CANARD_NODE_ID_UNSET;
-  meta.transfer_id = transfer_id_++;
-
-  transport_.Transmit(meta, sizeof(payload), payload);
+  const canard_us_t deadline = static_cast<canard_us_t>(now_us) + 1000000;
+  transport_.Publish13b(deadline, canard_prio_slow, kHeartbeatSubjectId, transfer_id_++, payload, sizeof(payload));
+  transport_.Poll();
 }
 
 // ---------------------------------------------------------------------------
 // HandleGetInfo  (uavcan.node.GetInfo.1.0 response)
 // ---------------------------------------------------------------------------
-void CyphalNode::HandleGetInfo(const CanardRxTransfer& transfer) {
-  // Minimal GetInfo response — fixed 58-byte response
+void CyphalNode::HandleGetInfo(const CyphalTransfer& t) {
   uint8_t resp[74]{};
   size_t offset = 0;
 
@@ -105,32 +96,21 @@ void CyphalNode::HandleGetInfo(const CanardRxTransfer& transfer) {
   std::memcpy(resp + offset, info_.name.data(), name_len);
   offset += name_len;
 
-  CanardTransferMetadata meta{};
-  meta.priority = CanardPriorityNominal;
-  meta.transfer_kind = CanardTransferKindResponse;
-  meta.port_id = kGetInfoServiceId;
-  meta.remote_node_id = transfer.metadata.remote_node_id;
-  meta.transfer_id = transfer.metadata.transfer_id;
-
-  transport_.Transmit(meta, offset, resp);
+  const canard_us_t deadline = static_cast<canard_us_t>(esp_timer_get_time()) + 1000000;
+  transport_.Respond(deadline, canard_prio_nominal, kGetInfoServiceId, t.source_node_id, t.transfer_id, resp, offset);
+  transport_.Poll();
 }
 
 // ---------------------------------------------------------------------------
 // HandleRegisterAccess
 // ---------------------------------------------------------------------------
-void CyphalNode::HandleRegisterAccess(const CanardRxTransfer& transfer) {
+void CyphalNode::HandleRegisterAccess(const CyphalTransfer& t) {
   // Monitor does not expose registers — respond with empty (not present)
-  uint8_t resp[2]{0x00, 0x00};
+  uint8_t resp[2]{0x00, 0x00};  // mutable=0, persistent=0, value tag=empty(0)
 
-  // Minimal register.Access.1.0 response: mutable=0, persistent=0, value tag=empty(0)
-  CanardTransferMetadata meta{};
-  meta.priority = CanardPriorityNominal;
-  meta.transfer_kind = CanardTransferKindResponse;
-  meta.port_id = kRegisterAccessServiceId;
-  meta.remote_node_id = transfer.metadata.remote_node_id;
-  meta.transfer_id = transfer.metadata.transfer_id;
-
-  transport_.Transmit(meta, sizeof(resp), resp);
+  const canard_us_t deadline = static_cast<canard_us_t>(esp_timer_get_time()) + 1000000;
+  transport_.Respond(deadline, canard_prio_nominal, kRegisterAccessServiceId, t.source_node_id, t.transfer_id, resp, sizeof(resp));
+  transport_.Poll();
 }
 
 }  // namespace cymon

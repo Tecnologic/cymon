@@ -21,23 +21,27 @@ class CyphalNode {
 
   CyphalNode(CyphalTransport& transport, const NodeInfo& info);
 
-  /// Call periodically from the Cyphal process task (1 Hz).
+  /// Call periodically (e.g. from the CAN RX task) to publish Heartbeat.
   void Spin(uint64_t now_us);
 
  private:
   void PublishHeartbeat(uint64_t now_us);
-  void HandleGetInfo(const CanardRxTransfer& transfer);
-  void HandleRegisterAccess(const CanardRxTransfer& transfer);
+  void HandleGetInfo(const CyphalTransfer& t);
+  void HandleRegisterAccess(const CyphalTransfer& t);
 
   CyphalTransport& transport_;
   NodeInfo info_;
-  uint8_t transfer_id_{0};
+  uint_least8_t transfer_id_{0};
   uint64_t last_heartbeat_us_{0};
 
-  // Subject / service IDs per UAVCAN standard
-  static constexpr CanardPortID kHeartbeatSubjectId = 7509u;
-  static constexpr CanardPortID kGetInfoServiceId = 430u;
-  static constexpr CanardPortID kRegisterAccessServiceId = 384u;
+  // Subject / service IDs per Cyphal standard
+  static constexpr uint16_t kHeartbeatSubjectId = 7509u;
+  static constexpr uint16_t kGetInfoServiceId = 430u;
+  static constexpr uint16_t kRegisterAccessServiceId = 384u;
+
+  // Subscription storage (must not move while registered)
+  canard_subscription_t sub_get_info_{};
+  canard_subscription_t sub_reg_access_{};
 };
 
 }  // namespace cymon

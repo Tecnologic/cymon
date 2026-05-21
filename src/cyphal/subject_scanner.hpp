@@ -14,7 +14,7 @@ namespace cymon {
 /// NodeRecord.
 class SubjectScanner {
  public:
-  static constexpr CanardPortID kRegisterListServiceId = 385u;
+  static constexpr uint16_t kRegisterListServiceId = 385u;
 
   using DoneCallback = std::function<void(uint8_t node_id, const std::vector<SubjectInfo>&)>;
 
@@ -27,18 +27,20 @@ class SubjectScanner {
   void Tick(uint64_t now_us);
 
  private:
-  void HandleResponse(const CanardRxTransfer& transfer);
+  void HandleResponse(const CyphalTransfer& t);
   void RequestNextPage();
 
   CyphalTransport& transport_;
   DoneCallback on_done_;
 
-  uint8_t pending_node_id_{CANARD_NODE_ID_UNSET};
+  uint8_t pending_node_id_{CANARD_NODE_ID_ANONYMOUS};
   uint16_t next_index_{0};
   uint64_t request_deadline_us_{0};
-  uint8_t transfer_id_{0};
+  uint_least8_t transfer_id_{0};
 
   std::vector<SubjectInfo> accumulated_;
+
+  canard_subscription_t sub_response_{};
 };
 
 }  // namespace cymon

@@ -14,11 +14,11 @@ static constexpr const char* kTag = "CYMON.ALLOC";
 // ---------------------------------------------------------------------------
 PnpAllocator::PnpAllocator(CyphalTransport& transport, uint8_t local_node_id)
     : transport_(transport), startup_us_(static_cast<uint64_t>(esp_timer_get_time())), local_node_id_(local_node_id) {
-  transport_.Subscribe(CanardTransferKindMessage, kPnpSubjectId,
-                       /*extent=*/19, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
+  transport_.Subscribe13b(&sub_pnp_, kPnpSubjectId,
+                          /*extent=*/19, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_us, &CyphalTransport::kDispatchVtable);
 
-  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindMessage && t.metadata.port_id == kPnpSubjectId) {
+  transport_.AddRxCallback([this](const CyphalTransfer& t) {
+    if (t.kind == canard_kind_message_13b && t.port_id == kPnpSubjectId) {
       HandleAllocationData(t);
     }
   });
@@ -41,12 +41,12 @@ void PnpAllocator::Tick(uint64_t now_us) {
 // ---------------------------------------------------------------------------
 // HandleAllocationData  (uavcan.pnp.NodeIDAllocationData.2.0)
 // ---------------------------------------------------------------------------
-void PnpAllocator::HandleAllocationData(const CanardRxTransfer& transfer) {
+void PnpAllocator::HandleAllocationData(const CyphalTransfer& t) {
   // If the transfer comes from a known node, it's an allocator response
-  if (transfer.metadata.remote_node_id != CANARD_NODE_ID_UNSET) {
+  if (t.source_node_id != CANARD_NODE_ID_ANONYMOUS) {
     if (!active_) {
       other_allocator_seen_ = true;
-      CYMON_LOGI(kTag, "Another allocator (node %u) detected", transfer.metadata.remote_node_id);
+      CYMON_LOGI(kTag, "Another allocator (node %u) detected", t.source_node_id);
     }
     return;
   }
@@ -57,10 +57,10 @@ void PnpAllocator::HandleAllocationData(const CanardRxTransfer& transfer) {
 
   // Parse unique_id from the message payload
   // NodeIDAllocationData.2.0: { unique_id: uint8[16] }
-  if (transfer.payload_size < 16) {
+  if (t.payload_size < 16) {
     return;
   }
-  const auto* uid = static_cast<const uint8_t*>(transfer.payload);
+  const auto* uid = static_cast<const uint8_t*>(t.payload);
   const uint8_t allocated_id = AllocateNodeId(uid);
 
   CYMON_LOGI(kTag, "Allocating node_id=%u for UID[0..7]=%02x%02x...", allocated_id, uid[0], uid[1]);
@@ -113,14 +113,9 @@ void PnpAllocator::SendAllocationResponse(const uint8_t* unique_id, uint8_t node
   payload[1] = 0;
   std::memcpy(payload + 2, unique_id, 16);
 
-  CanardTransferMetadata meta{};
-  meta.priority = CanardPriorityNominal;
-  meta.transfer_kind = CanardTransferKindMessage;
-  meta.port_id = kPnpSubjectId;
-  meta.remote_node_id = CANARD_NODE_ID_UNSET;
-  meta.transfer_id = transfer_id_++;
-
-  transport_.Transmit(meta, sizeof(payload), payload);
+  const canard_us_t deadline = static_cast<canard_us_t>(esp_timer_get_time()) + 1000000;
+  transport_.Publish13b(deadline, canard_prio_nominal, kPnpSubjectId, transfer_id_++, payload, sizeof(payload));
+  transport_.Poll();
 }
 
 }  // namespace cymon

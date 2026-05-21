@@ -72,7 +72,8 @@ extern "C" void app_main() {
   static cymon::CyphalTransport transport(cfg.cyphal_node_id);
 
   // Wire CAN → Cyphal
-  can_driver.SetRxCallback([&transport](const cymon::CanFrame& frame) { transport.Push(frame); });
+  transport.SetSendFn([&](const cymon::CanFrame& f) { return can_driver.Transmit(f); });
+  can_driver.SetRxCallback([&transport](const cymon::CanFrame& frame) { transport.IngestFrame(frame); });
 
   // Cyphal node
   cymon::CyphalNode::NodeInfo node_info{};
@@ -85,7 +86,7 @@ extern "C" void app_main() {
   // SetTxDrainFn must be called after cyphal_node is constructed.
   can_driver.SetTxDrainFn([&](uint64_t now) {
     cyphal_node.Spin(now);
-    transport.Drain([&](const cymon::CanFrame& f) { return can_driver.Transmit(f); }, now);
+    transport.Poll();
   });
 
   // Network scanner

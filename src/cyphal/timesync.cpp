@@ -12,11 +12,11 @@ static constexpr const char* kTag = "CYMON.TIME";
 // ---------------------------------------------------------------------------
 TimeSyncProvider::TimeSyncProvider(CyphalTransport& transport)
     : transport_(transport), last_master_seen_us_(static_cast<uint64_t>(esp_timer_get_time())) {
-  transport_.Subscribe(CanardTransferKindMessage, kTimeSyncSubjectId,
-                       /*extent=*/7, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
+  transport_.Subscribe13b(&sub_timesync_, kTimeSyncSubjectId,
+                          /*extent=*/7, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_us, &CyphalTransport::kDispatchVtable);
 
-  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindMessage && t.metadata.port_id == kTimeSyncSubjectId) {
+  transport_.AddRxCallback([this](const CyphalTransfer& t) {
+    if (t.kind == canard_kind_message_13b && t.port_id == kTimeSyncSubjectId) {
       HandleTimeSync(t);
     }
   });
@@ -25,9 +25,9 @@ TimeSyncProvider::TimeSyncProvider(CyphalTransport& transport)
 // ---------------------------------------------------------------------------
 // HandleTimeSync
 // ---------------------------------------------------------------------------
-void TimeSyncProvider::HandleTimeSync(const CanardRxTransfer& transfer) {
-  if (transfer.metadata.remote_node_id != CANARD_NODE_ID_UNSET) {
-    last_master_seen_us_ = static_cast<uint64_t>(transfer.timestamp_usec);
+void TimeSyncProvider::HandleTimeSync(const CyphalTransfer& t) {
+  if (t.source_node_id != CANARD_NODE_ID_ANONYMOUS) {
+    last_master_seen_us_ = static_cast<uint64_t>(t.timestamp_us);
     if (is_master_) {
       CYMON_LOGI(kTag, "External time master detected, stepping down");
       is_master_ = false;
@@ -57,25 +57,16 @@ void TimeSyncProvider::Tick(uint64_t now_us) {
 // ---------------------------------------------------------------------------
 void TimeSyncProvider::PublishTimeSync(uint64_t now_us) {
   // uavcan.time.Synchronization.1.0:
-  //   previous_transmission_timestamp_microsecond : uint56
-  // 7 bytes total.
-
+  //   previous_transmission_timestamp_microsecond : uint56 (7 bytes)
   uint8_t payload[7]{};
-  // previous_transmission_timestamp is the timestamp of the PREVIOUS publish
   const uint64_t ts = last_publish_us_;
   for (int i = 0; i < 7; ++i) {
     payload[i] = static_cast<uint8_t>((ts >> (8 * i)) & 0xFFu);
   }
 
-  CanardTransferMetadata meta{};
-  meta.priority = CanardPriorityRealTime;
-  meta.transfer_kind = CanardTransferKindMessage;
-  meta.port_id = kTimeSyncSubjectId;
-  meta.remote_node_id = CANARD_NODE_ID_UNSET;
-  meta.transfer_id = transfer_id_++;
-
-  transport_.Transmit(meta, sizeof(payload), payload);
-  (void)now_us;
+  const canard_us_t deadline = static_cast<canard_us_t>(now_us) + 1000000;
+  transport_.Publish13b(deadline, canard_prio_immediate, kTimeSyncSubjectId, transfer_id_++, payload, sizeof(payload));
+  transport_.Poll();
 }
 
 }  // namespace cymon

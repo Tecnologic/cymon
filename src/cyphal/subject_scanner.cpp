@@ -17,11 +17,11 @@ static constexpr std::string_view kPubPrefix = "uavcan.pub.";
 // Constructor
 // ---------------------------------------------------------------------------
 SubjectScanner::SubjectScanner(CyphalTransport& transport, DoneCallback on_done) : transport_(transport), on_done_(std::move(on_done)) {
-  transport_.Subscribe(CanardTransferKindResponse, kRegisterListServiceId,
-                       /*extent=*/261, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
+  transport_.SubscribeResponse(&sub_response_, kRegisterListServiceId,
+                               /*extent=*/261, &CyphalTransport::kDispatchVtable);
 
-  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindResponse && t.metadata.port_id == kRegisterListServiceId) {
+  transport_.AddRxCallback([this](const CyphalTransfer& t) {
+    if (t.kind == canard_kind_response && t.port_id == kRegisterListServiceId) {
       HandleResponse(t);
     }
   });
@@ -31,7 +31,7 @@ SubjectScanner::SubjectScanner(CyphalTransport& transport, DoneCallback on_done)
 // ScanNode
 // ---------------------------------------------------------------------------
 void SubjectScanner::ScanNode(uint8_t node_id) {
-  if (pending_node_id_ != CANARD_NODE_ID_UNSET) {
+  if (pending_node_id_ != CANARD_NODE_ID_ANONYMOUS) {
     return;
   }
   pending_node_id_ = node_id;
@@ -51,42 +51,36 @@ void SubjectScanner::RequestNextPage() {
   payload[0] = static_cast<uint8_t>(next_index_ & 0xFFu);
   payload[1] = static_cast<uint8_t>((next_index_ >> 8) & 0xFFu);
 
-  CanardTransferMetadata meta{};
-  meta.priority = CanardPriorityNominal;
-  meta.transfer_kind = CanardTransferKindRequest;
-  meta.port_id = kRegisterListServiceId;
-  meta.remote_node_id = pending_node_id_;
-  meta.transfer_id = transfer_id_++;
-
-  transport_.Transmit(meta, sizeof(payload), payload);
+  const canard_us_t deadline = static_cast<canard_us_t>(esp_timer_get_time()) + static_cast<canard_us_t>(kRequestTimeoutUs);
+  transport_.Request(deadline, canard_prio_nominal, kRegisterListServiceId, pending_node_id_, transfer_id_++, payload, sizeof(payload));
+  transport_.Poll();
 }
 
 // ---------------------------------------------------------------------------
 // Tick
 // ---------------------------------------------------------------------------
 void SubjectScanner::Tick(uint64_t now_us) {
-  if (pending_node_id_ != CANARD_NODE_ID_UNSET && now_us > request_deadline_us_) {
+  if (pending_node_id_ != CANARD_NODE_ID_ANONYMOUS && now_us > request_deadline_us_) {
     CYMON_LOGW(kTag, "register.List page %u from node %u timed out", next_index_, pending_node_id_);
-    // Complete with what we have so far
     if (on_done_)
       on_done_(pending_node_id_, accumulated_);
-    pending_node_id_ = CANARD_NODE_ID_UNSET;
+    pending_node_id_ = CANARD_NODE_ID_ANONYMOUS;
   }
 }
 
 // ---------------------------------------------------------------------------
 // HandleResponse  (uavcan.register.List.1.0 response)
 // ---------------------------------------------------------------------------
-void SubjectScanner::HandleResponse(const CanardRxTransfer& transfer) {
-  const uint8_t node_id = static_cast<uint8_t>(transfer.metadata.remote_node_id);
+void SubjectScanner::HandleResponse(const CyphalTransfer& t) {
+  const uint8_t node_id = t.source_node_id;
   if (node_id != pending_node_id_) {
     return;
   }
 
   // Response: variable-length string (register name), max 255 bytes
   // An empty name signals end of register list.
-  const uint8_t* p = static_cast<const uint8_t*>(transfer.payload);
-  if (transfer.payload_size < 1) {
+  const auto* p = static_cast<const uint8_t*>(t.payload);
+  if (t.payload_size < 1) {
     goto done;
   }
 
@@ -95,7 +89,7 @@ void SubjectScanner::HandleResponse(const CanardRxTransfer& transfer) {
     if (name_len == 0) {
       goto done;  // end of list
     }
-    if (static_cast<size_t>(name_len) > transfer.payload_size - 1) {
+    if (static_cast<size_t>(name_len) > t.payload_size - 1) {
       goto done;
     }
     std::string reg_name(reinterpret_cast<const char*>(p), name_len);
@@ -103,7 +97,6 @@ void SubjectScanner::HandleResponse(const CanardRxTransfer& transfer) {
     // Filter: keep only "uavcan.pub.<name>.id" registers
     if (reg_name.starts_with(kPubPrefix)) {
       SubjectInfo si{};
-      // Extract the subject name between "uavcan.pub." and ".id"
       const size_t start = kPubPrefix.size();
       const size_t end_pos = reg_name.rfind(".id");
       if (end_pos != std::string::npos && end_pos > start) {
@@ -111,7 +104,7 @@ void SubjectScanner::HandleResponse(const CanardRxTransfer& transfer) {
       } else {
         si.data_type = reg_name;
       }
-      si.subject_id = 0xFFFFu;  // will be filled in when register.Access resolves the value
+      si.subject_id = 0xFFFFu;  // filled in when register.Access resolves the value
       accumulated_.push_back(si);
     }
 
@@ -125,7 +118,7 @@ done:
   if (on_done_) {
     on_done_(node_id, accumulated_);
   }
-  pending_node_id_ = CANARD_NODE_ID_UNSET;
+  pending_node_id_ = CANARD_NODE_ID_ANONYMOUS;
 }
 
 }  // namespace cymon

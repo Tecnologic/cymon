@@ -27,13 +27,15 @@ class NetworkScanner {
   }
 
  private:
-  void HandleHeartbeat(const CanardRxTransfer& transfer);
+  void HandleHeartbeat(const CyphalTransfer& t);
 
   CyphalTransport& transport_;
   NodeChangedCallback on_change_;
   std::map<uint8_t, NodeRecord> nodes_;
 
-  static constexpr CanardPortID kHeartbeatSubjectId = 7509u;
+  static constexpr uint16_t kHeartbeatSubjectId = 7509u;
+
+  canard_subscription_t sub_heartbeat_{};
 };
 
 }  // namespace cymon

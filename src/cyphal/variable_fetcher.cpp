@@ -12,11 +12,11 @@ static constexpr uint64_t kRequestTimeoutUs = 500000u;  // 500 ms
 // Constructor
 // ---------------------------------------------------------------------------
 VariableFetcher::VariableFetcher(CyphalTransport& transport, DoneCallback on_done) : transport_(transport), on_done_(std::move(on_done)) {
-  transport_.Subscribe(CanardTransferKindResponse, kGetVariableListServiceId,
-                       /*extent=*/512, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
+  transport_.SubscribeResponse(&sub_response_, kGetVariableListServiceId,
+                               /*extent=*/512, &CyphalTransport::kDispatchVtable);
 
-  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
-    if (t.metadata.transfer_kind == CanardTransferKindResponse && t.metadata.port_id == kGetVariableListServiceId) {
+  transport_.AddRxCallback([this](const CyphalTransfer& t) {
+    if (t.kind == canard_kind_response && t.port_id == kGetVariableListServiceId) {
       HandleResponse(t);
     }
   });
@@ -26,21 +26,15 @@ VariableFetcher::VariableFetcher(CyphalTransport& transport, DoneCallback on_don
 // RequestFrom
 // ---------------------------------------------------------------------------
 void VariableFetcher::RequestFrom(uint8_t node_id) {
-  if (pending_node_id_ != CANARD_NODE_ID_UNSET) {
+  if (pending_node_id_ != CANARD_NODE_ID_ANONYMOUS) {
     return;
   }
   pending_node_id_ = node_id;
   request_deadline_us_ = static_cast<uint64_t>(esp_timer_get_time()) + kRequestTimeoutUs;
 
-  CanardTransferMetadata meta{};
-  meta.priority = CanardPriorityNominal;
-  meta.transfer_kind = CanardTransferKindRequest;
-  meta.port_id = kGetVariableListServiceId;
-  meta.remote_node_id = node_id;
-  meta.transfer_id = transfer_id_++;
-
-  // Empty request payload
-  transport_.Transmit(meta, 0, nullptr);
+  const canard_us_t deadline = static_cast<canard_us_t>(esp_timer_get_time()) + static_cast<canard_us_t>(kRequestTimeoutUs);
+  transport_.Request(deadline, canard_prio_nominal, kGetVariableListServiceId, node_id, transfer_id_++, nullptr, 0);
+  transport_.Poll();
   CYMON_LOGD(kTag, "Requested variable list from node %u", node_id);
 }
 
@@ -48,29 +42,29 @@ void VariableFetcher::RequestFrom(uint8_t node_id) {
 // Tick
 // ---------------------------------------------------------------------------
 void VariableFetcher::Tick(uint64_t now_us) {
-  if (pending_node_id_ != CANARD_NODE_ID_UNSET && now_us > request_deadline_us_) {
+  if (pending_node_id_ != CANARD_NODE_ID_ANONYMOUS && now_us > request_deadline_us_) {
     CYMON_LOGW(kTag, "Variable list request to node %u timed out", pending_node_id_);
-    pending_node_id_ = CANARD_NODE_ID_UNSET;
+    pending_node_id_ = CANARD_NODE_ID_ANONYMOUS;
   }
 }
 
 // ---------------------------------------------------------------------------
 // HandleResponse
 // ---------------------------------------------------------------------------
-void VariableFetcher::HandleResponse(const CanardRxTransfer& transfer) {
-  const uint8_t node_id = static_cast<uint8_t>(transfer.metadata.remote_node_id);
+void VariableFetcher::HandleResponse(const CyphalTransfer& t) {
+  const uint8_t node_id = t.source_node_id;
   if (node_id != pending_node_id_) {
     return;
   }
-  pending_node_id_ = CANARD_NODE_ID_UNSET;
+  pending_node_id_ = CANARD_NODE_ID_ANONYMOUS;
 
   // Parse variable list from payload.
   // Format (provisional, matches cymon-lib GetVariableList.1.0 response):
   //   uint8_t  count
   //   [count × { uint16_t variable_id, uint8_t name_len, char name[], uint8_t unit_len, char unit[] }]
   std::vector<VariableInfo> vars;
-  const uint8_t* p = static_cast<const uint8_t*>(transfer.payload);
-  const uint8_t* end = p + transfer.payload_size;
+  const auto* p = static_cast<const uint8_t*>(t.payload);
+  const auto* end = p + t.payload_size;
 
   if (p >= end) {
     CYMON_LOGW(kTag, "Empty variable list response from node %u", node_id);
