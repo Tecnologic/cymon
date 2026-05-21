@@ -48,19 +48,19 @@ bool WebServer::Start() {
 
   // Register REST endpoints
   static const httpd_uri_t uris[] = {
-      {"/api/nodes", HTTP_GET, HandleGetNodes, nullptr},
-      {"/api/session", HTTP_POST, HandlePostSession, nullptr},
-      {"/api/session/*", HTTP_DELETE, HandleDeleteSession, nullptr},
-      {"/api/wifi", HTTP_POST, HandlePostWifi, nullptr},
-      {"/api/can", HTTP_POST, HandlePostCan, nullptr},
-      {"/api/settings", HTTP_GET, HandleGetSettings, nullptr},
+      {.uri = "/api/nodes", .method = HTTP_GET, .handler = HandleGetNodes, .user_ctx = nullptr},
+      {.uri = "/api/session", .method = HTTP_POST, .handler = HandlePostSession, .user_ctx = nullptr},
+      {.uri = "/api/session/*", .method = HTTP_DELETE, .handler = HandleDeleteSession, .user_ctx = nullptr},
+      {.uri = "/api/wifi", .method = HTTP_POST, .handler = HandlePostWifi, .user_ctx = nullptr},
+      {.uri = "/api/can", .method = HTTP_POST, .handler = HandlePostCan, .user_ctx = nullptr},
+      {.uri = "/api/settings", .method = HTTP_GET, .handler = HandleGetSettings, .user_ctx = nullptr},
       {.uri = "/ws",
        .method = HTTP_GET,
        .handler = HandleWebSocket,
        .user_ctx = nullptr,
        .is_websocket = true,
        .handle_ws_control_frames = true},
-      {"/*", HTTP_GET, HandleStaticFile, nullptr},  // catch-all for SPIFFS
+      {.uri = "/*", .method = HTTP_GET, .handler = HandleStaticFile, .user_ctx = nullptr},  // catch-all for SPIFFS
   };
 
   for (const auto& uri : uris) {
