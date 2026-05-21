@@ -1,5 +1,8 @@
 # cymon
 
+[![Host Tests & Lint](https://github.com/Tecnologic/cymon/actions/workflows/ci.yml/badge.svg)](https://github.com/Tecnologic/cymon/actions/workflows/ci.yml)
+[![Firmware Build (ESP32-S2)](https://github.com/Tecnologic/cymon/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/Tecnologic/cymon/actions/workflows/firmware-build.yml)
+
 **Cyphal network monitor firmware for ESP32-S2**
 
 cymon is an ESP32-S2 firmware that acts as a Cyphal (formerly UAVCAN) network
