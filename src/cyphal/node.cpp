@@ -23,7 +23,7 @@ CyphalNode::CyphalNode(CyphalTransport& transport, const NodeInfo& info) : trans
   transport_.Subscribe(CanardTransferKindRequest, kRegisterAccessServiceId,
                        /*extent=*/264, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
-  transport_.SetRxCallback([this](const CanardRxTransfer& t) {
+  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
     if (t.metadata.transfer_kind == CanardTransferKindRequest) {
       if (t.metadata.port_id == kGetInfoServiceId) {
         HandleGetInfo(t);

@@ -20,7 +20,7 @@ SubjectScanner::SubjectScanner(CyphalTransport& transport, DoneCallback on_done)
   transport_.Subscribe(CanardTransferKindResponse, kRegisterListServiceId,
                        /*extent=*/261, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
-  transport_.SetRxCallback([this](const CanardRxTransfer& t) {
+  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
     if (t.metadata.transfer_kind == CanardTransferKindResponse && t.metadata.port_id == kRegisterListServiceId) {
       HandleResponse(t);
     }

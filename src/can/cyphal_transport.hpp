@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <vector>
 
 #include "transport/can_frame.hpp"
 
@@ -49,9 +50,12 @@ class CyphalTransport {
   using SendFn = std::function<bool(const CanFrame&)>;
   void Drain(const SendFn& send_fn, CanardMicrosecond now_us);
 
-  /// Register a callback for received transfers.
-  void SetRxCallback(CyphalRxCallback cb) {
-    rx_callback_ = std::move(cb);
+  /// Register a callback for received transfers.  Multiple callbacks are
+  /// supported; each is invoked for every completed transfer regardless of
+  /// port or kind (libcanard's subscription filtering means each callback
+  /// only sees transfers for ports it subscribed to via Subscribe()).
+  void AddRxCallback(CyphalRxCallback cb) {
+    rx_callbacks_.push_back(std::move(cb));
   }
 
   [[nodiscard]] uint8_t NodeId() const {
@@ -75,7 +79,7 @@ class CyphalTransport {
   CanardInstance canard_{};
   CanardTxQueue tx_queue_{};
 
-  CyphalRxCallback rx_callback_;
+  std::vector<CyphalRxCallback> rx_callbacks_;
 };
 
 }  // namespace cymon

@@ -15,7 +15,7 @@ TimeSyncProvider::TimeSyncProvider(CyphalTransport& transport)
   transport_.Subscribe(CanardTransferKindMessage, kTimeSyncSubjectId,
                        /*extent=*/7, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
-  transport_.SetRxCallback([this](const CanardRxTransfer& t) {
+  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
     if (t.metadata.transfer_kind == CanardTransferKindMessage && t.metadata.port_id == kTimeSyncSubjectId) {
       HandleTimeSync(t);
     }

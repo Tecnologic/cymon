@@ -103,8 +103,8 @@ void CyphalTransport::Push(const CanFrame& frame) {
 
   const int8_t result = canardRxAccept(&canard_, static_cast<CanardMicrosecond>(frame.timestamp_us), &cf, 0, &transfer, &sub);
   if (result == 1) {
-    if (rx_callback_) {
-      rx_callback_(transfer);
+    for (const auto& cb : rx_callbacks_) {
+      cb(transfer);
     }
     canard_.memory.deallocate(&canard_, transfer.payload);
   }

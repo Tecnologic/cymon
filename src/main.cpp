@@ -45,7 +45,6 @@ static cymon::SessionManager g_session_manager;
 // Task bodies (forward declarations)
 // ---------------------------------------------------------------------------
 static void CanRxTaskBody(void* arg);
-static void CyphalProcessTaskBody(void* arg);
 static void ScannerTaskBody(void* arg);
 static void WsStreamerTaskBody(void* arg);
 
@@ -80,6 +79,14 @@ extern "C" void app_main() {
   // Read 128-bit unique ID from ESP32-S2 eFuse
   esp_efuse_read_field_blob(ESP_EFUSE_OPTIONAL_UNIQUE_ID, node_info.unique_id, 128);
   static cymon::CyphalNode cyphal_node(transport, node_info);
+
+  // Drain TX and spin the node heartbeat from inside the single CAN task.
+  // This makes the RX task the sole owner of the SPI bus — no mutex needed.
+  // SetTxDrainFn must be called after cyphal_node is constructed.
+  can_driver.SetTxDrainFn([&](uint64_t now) {
+    cyphal_node.Spin(now);
+    transport.Drain([&](const cymon::CanFrame& f) { return can_driver.Transmit(f); }, now);
+  });
 
   // Network scanner
   static cymon::NetworkScanner scanner(transport, [](const cymon::NodeRecord& rec) {
@@ -133,7 +140,6 @@ extern "C" void app_main() {
                        &subj_scanner, &pnp_allocator, &time_sync,   &ws_streamer};
 
   xTaskCreatePinnedToCore(CanRxTaskBody, "can_rx", 4096, &args, 20, nullptr, 1);
-  xTaskCreatePinnedToCore(CyphalProcessTaskBody, "cyp_proc", 6144, &args, 18, nullptr, 1);
   xTaskCreatePinnedToCore(ScannerTaskBody, "scanner", 4096, &args, 10, nullptr, 0);
   xTaskCreatePinnedToCore(WsStreamerTaskBody, "ws_stream", 8192, &args, 8, nullptr, 0);
 
@@ -149,23 +155,6 @@ static void CanRxTaskBody(void* arg) {
   };
   auto* a = static_cast<LocalArgs*>(arg);
   a->can->RxTask();  // Never returns
-}
-
-static void CyphalProcessTaskBody(void* arg) {
-  // TaskArgs forward declaration trick via void*
-  struct LocalArgs {
-    cymon::Mcp2518fd* can;
-    cymon::CyphalTransport* transport;
-    cymon::CyphalNode* node;
-  };
-  auto* a = static_cast<LocalArgs*>(arg);
-
-  for (;;) {
-    const uint64_t now = static_cast<uint64_t>(esp_timer_get_time());
-    a->node->Spin(now);
-    a->transport->Drain([a](const cymon::CanFrame& f) { return a->can->Transmit(f); }, now);
-    vTaskDelay(pdMS_TO_TICKS(1));
-  }
 }
 
 static void ScannerTaskBody(void* arg) {

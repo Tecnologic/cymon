@@ -17,7 +17,7 @@ PnpAllocator::PnpAllocator(CyphalTransport& transport, uint8_t local_node_id)
   transport_.Subscribe(CanardTransferKindMessage, kPnpSubjectId,
                        /*extent=*/19, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
-  transport_.SetRxCallback([this](const CanardRxTransfer& t) {
+  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
     if (t.metadata.transfer_kind == CanardTransferKindMessage && t.metadata.port_id == kPnpSubjectId) {
       HandleAllocationData(t);
     }

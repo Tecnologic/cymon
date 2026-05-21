@@ -15,7 +15,7 @@ VariableFetcher::VariableFetcher(CyphalTransport& transport, DoneCallback on_don
   transport_.Subscribe(CanardTransferKindResponse, kGetVariableListServiceId,
                        /*extent=*/512, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
-  transport_.SetRxCallback([this](const CanardRxTransfer& t) {
+  transport_.AddRxCallback([this](const CanardRxTransfer& t) {
     if (t.metadata.transfer_kind == CanardTransferKindResponse && t.metadata.port_id == kGetVariableListServiceId) {
       HandleResponse(t);
     }

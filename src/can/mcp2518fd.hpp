@@ -63,6 +63,15 @@ class Mcp2518fd {
     rx_callback_ = std::move(cb);
   }
 
+  /// Register a function called at the end of every RX-task iteration to
+  /// drain pending TX frames.  Argument is the current time in microseconds.
+  /// Providing a drain function makes the RX task the sole owner of the SPI
+  /// bus, eliminating the need for any mutex around SPI transactions.
+  using TxDrainFn = std::function<void(uint64_t)>;
+  void SetTxDrainFn(TxDrainFn fn) {
+    tx_drain_fn_ = std::move(fn);
+  }
+
   /// FreeRTOS task body — call from a pinned high-priority task on core 1.
   void RxTask();
 
@@ -89,6 +98,7 @@ class Mcp2518fd {
 
   void* spi_device_{nullptr};  ///< spi_device_handle_t (opaque)
   CanRxCallback rx_callback_;
+  TxDrainFn tx_drain_fn_;
   bool initialized_{false};
 };
 

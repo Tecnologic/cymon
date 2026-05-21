@@ -175,6 +175,12 @@ void Mcp2518fd::RxTask() {
         rx_callback_(frames[i]);
       }
     }
+
+    // Drain pending TX frames.  Calling this here keeps all SPI access
+    // inside this single task, so no mutex is required.
+    if (tx_drain_fn_) {
+      tx_drain_fn_(static_cast<uint64_t>(esp_timer_get_time()));
+    }
   }
 }
 
