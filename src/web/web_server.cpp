@@ -54,7 +54,12 @@ bool WebServer::Start() {
       {"/api/wifi", HTTP_POST, HandlePostWifi, nullptr},
       {"/api/can", HTTP_POST, HandlePostCan, nullptr},
       {"/api/settings", HTTP_GET, HandleGetSettings, nullptr},
-      {"/ws", HTTP_GET, HandleWebSocket, nullptr},
+      {.uri = "/ws",
+       .method = HTTP_GET,
+       .handler = HandleWebSocket,
+       .user_ctx = nullptr,
+       .is_websocket = true,
+       .handle_ws_control_frames = true},
       {"/*", HTTP_GET, HandleStaticFile, nullptr},  // catch-all for SPIFFS
   };
 
@@ -89,8 +94,8 @@ void WebServer::BroadcastWs(const uint8_t* data, size_t len) {
   frame.len = len;
 
   // Iterate over all open file descriptors and send to WebSocket clients
-  size_t clients = 0;
   int client_fds[8]{};
+  size_t clients = std::size(client_fds);
   if (httpd_get_client_list(server_, &clients, client_fds) == ESP_OK) {
     for (size_t i = 0; i < clients; ++i) {
       const httpd_ws_client_info_t info = httpd_ws_get_fd_info(server_, client_fds[i]);
