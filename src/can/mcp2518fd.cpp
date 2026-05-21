@@ -23,7 +23,10 @@ static TaskHandle_t s_rx_task_handle = nullptr;
 // ---------------------------------------------------------------------------
 // ISR — called when INT pin goes low
 // ---------------------------------------------------------------------------
-static void IRAM_ATTR GpioIsrHandler(void* arg) {
+static void IRAM_ATTR GpioIsrHandler(void* /*arg*/) {
+  if (s_rx_task_handle == nullptr) {
+    return;  // RX task not yet started — ISR fired too early, ignore
+  }
   BaseType_t higher_priority_woken = pdFALSE;
   vTaskNotifyGiveFromISR(s_rx_task_handle, &higher_priority_woken);
   portYIELD_FROM_ISR(higher_priority_woken);

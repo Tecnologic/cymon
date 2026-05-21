@@ -96,8 +96,8 @@ extern "C" void app_main() {
     CYMON_LOGI(kTag, "Node %u: %zu subjects", node_id, subs.size());
   });
 
-  // PnP allocator
-  static cymon::PnpAllocator pnp_allocator(transport);
+  // PnP allocator — reserve the monitor's own node-ID so it is never handed out
+  static cymon::PnpAllocator pnp_allocator(transport, cfg.cyphal_node_id);
 
   // Time sync
   static cymon::TimeSyncProvider time_sync(transport);

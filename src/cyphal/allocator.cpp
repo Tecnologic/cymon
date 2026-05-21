@@ -12,7 +12,8 @@ static constexpr const char* kTag = "CYMON.ALLOC";
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
-PnpAllocator::PnpAllocator(CyphalTransport& transport) : transport_(transport), startup_us_(static_cast<uint64_t>(esp_timer_get_time())) {
+PnpAllocator::PnpAllocator(CyphalTransport& transport, uint8_t local_node_id)
+    : transport_(transport), local_node_id_(local_node_id), startup_us_(static_cast<uint64_t>(esp_timer_get_time())) {
   transport_.Subscribe(CanardTransferKindMessage, kPnpSubjectId,
                        /*extent=*/19, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 
@@ -78,8 +79,12 @@ uint8_t PnpAllocator::AllocateNodeId(const uint8_t* unique_id_16) {
     return it->second;
   }
 
-  // Find a free ID (skip IDs already allocated)
+  // Find a free ID, skipping the monitor's own node-ID and already-allocated IDs
   while (next_dynamic_id_ < 127) {
+    if (next_dynamic_id_ == local_node_id_) {
+      ++next_dynamic_id_;
+      continue;
+    }
     bool used = false;
     for (const auto& [k, v] : allocation_table_) {
       if (v == next_dynamic_id_) {

@@ -12,19 +12,20 @@ class WebServer;
 /// Serialises all active session graph data to MessagePack binary and
 /// broadcasts via WebSocket at kPublishHz.
 ///
-/// MessagePack format (server → client, per session):
-/// {
-///   "s": uint8          -- session_id
-///   "n": uint8          -- num_channels
-///   "ch": [             -- array of channels
-///     {
-///       "nid": uint8,
-///       "vid": uint8,
-///       "t":  [uint64, ...]   -- timestamp_us array
-///       "v":  [float32, ...]  -- value array (MessagePack float32 / 0xCA)
-///     }, ...
-///   ]
-/// }
+/// Wire format (MessagePack map, server → client, one message per session):
+///
+///   fixmap(3)
+///     "s"  → uint8  session_id     (positive fixint 0x00–0x7F, or 0xCC+byte)
+///     "n"  → uint8  num_channels   (positive fixint 0x00–0x7F, or 0xCC+byte)
+///     "ch" → fixarray / array16 of per-channel fixmap(4):
+///              "nid" → uint8  node_id      (positive fixint / 0xCC+byte)
+///              "vid" → uint8  variable_id  (positive fixint / 0xCC+byte)
+///              "t"   → fixarray / array16 of uint64 (0xCF + 8 bytes big-endian)
+///              "v"   → fixarray / array16 of float32 (0xCA + 4 bytes IEEE-754 BE)
+///
+/// Encoding is produced by msgpack::BufWriter (ws_streamer.cpp).  If the
+/// internal scratch buffer overflows, the message is silently dropped and a
+/// warning is logged via CYMON_LOGW.
 class WsStreamer {
  public:
   static constexpr uint32_t kPublishHz = 10;

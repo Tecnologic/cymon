@@ -17,7 +17,7 @@ class PnpAllocator {
   static constexpr CanardPortID kPnpSubjectId = 8166u;
   static constexpr uint64_t kPassiveWindowUs = 3000000u;  // 3 s
 
-  explicit PnpAllocator(CyphalTransport& transport);
+  explicit PnpAllocator(CyphalTransport& transport, uint8_t local_node_id);
 
   void Tick(uint64_t now_us);
 
@@ -39,7 +39,8 @@ class PnpAllocator {
 
   // unique_id (truncated to 8 bytes as key) → allocated node_id
   std::map<uint64_t, uint8_t> allocation_table_;
-  uint8_t next_dynamic_id_{2};  // 1 is reserved for the monitor itself
+  uint8_t local_node_id_{127};  ///< Monitor's own node-ID; never handed out
+  uint8_t next_dynamic_id_{2};  ///< Next candidate ID to try (starts at 2, wraps before 127)
 };
 
 }  // namespace cymon
