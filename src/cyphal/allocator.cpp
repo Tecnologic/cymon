@@ -13,7 +13,7 @@ static constexpr const char* kTag = "CYMON.ALLOC";
 // Constructor
 // ---------------------------------------------------------------------------
 PnpAllocator::PnpAllocator(CyphalTransport& transport, uint8_t local_node_id)
-    : transport_(transport), local_node_id_(local_node_id), startup_us_(static_cast<uint64_t>(esp_timer_get_time())) {
+    : transport_(transport), startup_us_(static_cast<uint64_t>(esp_timer_get_time())), local_node_id_(local_node_id) {
   transport_.Subscribe(CanardTransferKindMessage, kPnpSubjectId,
                        /*extent=*/19, CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC);
 

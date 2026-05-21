@@ -14,7 +14,7 @@ namespace cymon {
 /// Callback invoked when a complete Cyphal transfer is received.
 using CyphalRxCallback = std::function<void(const CanardRxTransfer&)>;
 
-/// Cyphal transport layer using libcanard v4 and o1heap.
+/// Cyphal transport layer using libcanard v3 and o1heap.
 ///
 /// Owns a CanardInstance and an o1heap allocator.  Integrates with the
 /// MCP2518FD driver by exposing a Push() method (for inbound frames) and

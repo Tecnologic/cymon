@@ -47,7 +47,7 @@ CyphalTransport::~CyphalTransport() {
   // Pop and free all pending TX frames
   const CanardTxQueueItem* item = canardTxPeek(&tx_queue_);
   while (item != nullptr) {
-    canard_.memory.deallocate(&canard_, canardTxPop(&tx_queue_, item));
+    canard_.memory_free(&canard_, canardTxPop(&tx_queue_, item));
     item = canardTxPeek(&tx_queue_);
   }
 }
@@ -106,7 +106,7 @@ void CyphalTransport::Push(const CanFrame& frame) {
     for (const auto& cb : rx_callbacks_) {
       cb(transfer);
     }
-    canard_.memory.deallocate(&canard_, transfer.payload);
+    canard_.memory_free(&canard_, transfer.payload);
   }
 }
 
@@ -118,7 +118,7 @@ void CyphalTransport::Drain(const SendFn& send_fn, CanardMicrosecond now_us) {
   while (item != nullptr) {
     if (item->tx_deadline_usec < now_us) {
       // Expired — discard
-      canard_.memory.deallocate(&canard_, canardTxPop(&tx_queue_, item));
+      canard_.memory_free(&canard_, canardTxPop(&tx_queue_, item));
       item = canardTxPeek(&tx_queue_);
       continue;
     }
@@ -134,7 +134,7 @@ void CyphalTransport::Drain(const SendFn& send_fn, CanardMicrosecond now_us) {
     if (!send_fn(cf)) {
       break;  // TX FIFO full — retry next call
     }
-    canard_.memory.deallocate(&canard_, canardTxPop(&tx_queue_, item));
+    canard_.memory_free(&canard_, canardTxPop(&tx_queue_, item));
     item = canardTxPeek(&tx_queue_);
   }
 }
