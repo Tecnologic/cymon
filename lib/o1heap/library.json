@@ -1,0 +1,8 @@
+{
+  "name": "o1heap",
+  "version": "2.0.0",
+  "build": {
+    "flags": ["-std=c11", "-Wno-error"],
+    "unflags": ["-std=gnu23", "-std=gnu17"]
+  }
+}

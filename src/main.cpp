@@ -10,6 +10,7 @@
 #include "cyphal/timesync.hpp"
 #include "cyphal/variable_fetcher.hpp"
 #include "esp_efuse.h"
+#include "esp_efuse_table.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -73,7 +74,7 @@ extern "C" void app_main() {
 
   // Wire CAN → Cyphal
   transport.SetSendFn([&](const cymon::CanFrame& f) { return can_driver.Transmit(f); });
-  can_driver.SetRxCallback([&transport](const cymon::CanFrame& frame) { transport.IngestFrame(frame); });
+  can_driver.SetRxCallback([](const cymon::CanFrame& frame) { transport.IngestFrame(frame); });
 
   // Cyphal node
   cymon::CyphalNode::NodeInfo node_info{};
