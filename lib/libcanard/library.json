@@ -2,7 +2,7 @@
   "name": "libcanard",
   "version": "4.0.0",
   "build": {
-    "flags": ["-std=gnu17", "-Wno-error"],
-    "unflags": ["-std=gnu23"]
+    "flags": ["-std=c11", "-Wno-error"],
+    "unflags": ["-std=gnu23", "-std=gnu17"]
   }
 }
