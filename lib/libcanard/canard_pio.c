@@ -1,4 +1,4 @@
-// canard_pio.c — PlatformIO/ESP-IDF wrapper for canard.c
+// canard_pio.c - PlatformIO/ESP-IDF wrapper for canard.c
 //
 // Problem: ESP-IDF's platform_include/assert.h (included by canard.c via
 //          <assert.h>) unconditionally includes <stdlib.h>, which in
