@@ -82,3 +82,4 @@ data/www/vendor/*.css
 .vscode/launch.json
 .vscode/c_cpp_properties.json
 sdkconfig.esp32s2mini
+sdkconfig.esp32s2mini_debug
