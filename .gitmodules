@@ -1,4 +1,6 @@
 [submodule "lib/cymon-lib"]
 	path = lib/cymon-lib
 	url = https://github.com/Tecnologic/cymon-lib.git
-	branch = main
+[submodule "dsdl/public_regulated_data_types"]
+	path = dsdl/public_regulated_data_types
+	url = https://github.com/OpenCyphal/public_regulated_data_types.git
