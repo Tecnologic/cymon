@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [main, develop, "claude/**", "copilot/**"]
+  # Pull requests only; a push to a branch runs nothing.
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
