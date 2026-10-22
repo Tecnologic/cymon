@@ -34,6 +34,8 @@ import uavcan.node
 import uavcan.primitive.array
 from pycyphal.application.register import Natural16, Real32, Value
 
+from . import __version__
+
 SERVICE_IDS = {
     "cymon_variables": 120,
     "cymon_buffer_info": 121,
@@ -170,7 +172,7 @@ class DemoDevice:
         registry = pycyphal.application.make_registry(None, env)
         info = uavcan.node.GetInfo_1.Response(
             protocol_version=uavcan.node.Version_1(1, 0),
-            software_version=uavcan.node.Version_1(0, 2),
+            software_version=uavcan.node.Version_1(*map(int, __version__.split(".")[:2])),
             hardware_version=uavcan.node.Version_1(1, 0),
             unique_id=hashlib.md5(name.encode()).digest(),
             name=name,

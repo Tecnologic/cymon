@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import socket
+from pathlib import Path
 
 import httpx
 import uvicorn
@@ -13,19 +14,21 @@ import websockets
 
 from cymon_app.admin import Admin
 from cymon_app.demo import READINESS_SUBJECT, DemoDevice
+from cymon_app.session import Session
 from cymon_app.web.server import CLIENT_HEADER, create_app
 
 from .conftest import DEVICE_ID, wait_for
 
 
-def _client(admin: Admin) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(admin)), base_url="http://test")
+def _client(session: Session) -> httpx.AsyncClient:
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(session)), base_url="http://test")
 
 
 async def test_rest(bus: tuple[Admin, DemoDevice]) -> None:
     admin, device = bus
-    async with _client(admin) as http:
-        assert (await http.get("/api/status")).json()["node_id"] == 127
+    async with _client(Session(admin)) as http:
+        status = (await http.get("/api/status")).json()
+        assert status["connected"] and status["node_id"] == 127
         assert [n["node_id"] for n in (await http.get("/api/nodes")).json()] == [DEVICE_ID]
         assert (await http.get("/api/nodes/99/registers")).status_code == 404
 
@@ -65,7 +68,8 @@ def _free_port() -> int:
 async def test_websocket_disconnect_stops_publications(bus: tuple[Admin, DemoDevice]) -> None:
     admin, device = bus
     port = _free_port()
-    server = uvicorn.Server(uvicorn.Config(create_app(admin), host="127.0.0.1", port=port, log_level="warning"))
+    config = uvicorn.Config(create_app(Session(admin)), host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
     task = asyncio.create_task(server.serve())
     await wait_for(lambda: server.started)
     try:
@@ -94,3 +98,35 @@ async def test_websocket_disconnect_stops_publications(bus: tuple[Admin, DemoDev
     finally:
         server.should_exit = True
         await task
+
+
+async def test_connect_from_the_ui(tmp_path: Path) -> None:
+    """Started without a bus: load DSDL, connect to simulated devices, disconnect."""
+    session = Session()
+    try:
+        async with _client(session) as http:
+            status = (await http.get("/api/status")).json()
+            assert not status["connected"] and "cymon" in status["dsdl"]["namespaces"]
+            assert (await http.get("/api/nodes")).status_code == 503
+            assert (await http.get("/api/adapters")).status_code == 200
+            assert (await http.post("/api/connect", json={"interfaces": []})).status_code == 400
+
+            namespace = tmp_path / "testns"
+            (namespace / "sub").mkdir(parents=True)
+            (namespace / "sub" / "Thing.1.0.dsdl").write_text("float32 value\n@sealed\n")
+            r = await http.put("/api/dsdl", json={"roots": [str(namespace)]})
+            assert r.status_code == 200 and "testns" in r.json()["namespaces"]
+            assert "testns.sub.Thing.1.0" in (await http.get("/api/types")).json()
+            assert (await http.put("/api/dsdl", json={"roots": [str(tmp_path / "nope")]})).status_code == 400
+            assert (await http.put("/api/dsdl", json={"roots": []})).json()["roots"] == []
+            assert "testns.sub.Thing.1.0" not in (await http.get("/api/types")).json()
+
+            r = await http.post("/api/connect", json={"demo_devices": 1})
+            assert r.status_code == 200 and r.json()["connected"] and r.json()["config"]["demo_devices"] == 1
+            await wait_for(lambda: DEVICE_ID in session.admin.nodes)  # type: ignore[union-attr]
+            assert [n["node_id"] for n in (await http.get("/api/nodes")).json()] == [DEVICE_ID]
+
+            assert not (await http.post("/api/disconnect")).json()["connected"]
+            assert (await http.get("/api/nodes")).status_code == 503
+    finally:
+        session.close()

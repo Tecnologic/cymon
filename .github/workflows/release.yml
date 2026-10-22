@@ -1,0 +1,54 @@
+name: Release
+
+# release-please keeps a release pull request open that collects the
+# conventional commits on main (feat: minor, fix: patch, while below 1.0) and
+# bumps the version in pyproject.toml and cymon_app/__init__.py. Merging it
+# tags vX.Y.Z and creates the GitHub release; the executables and the wheel
+# are then built and attached to it.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      release: true
+
+  publish:
+    needs: [release-please, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cymon-*
+          merge-multiple: true
+          path: dist
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+        run: gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber

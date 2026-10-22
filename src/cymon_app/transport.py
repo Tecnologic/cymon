@@ -18,12 +18,20 @@ goes out on all of them and is deduplicated on reception.
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
+from typing import Any
 
 import pycyphal.transport
 from pycyphal.transport.can import CANTransport
 from pycyphal.transport.redundant import RedundantTransport
 
 from . import canable
+
+#: USB IDs of serial-port CAN adapters cymon knows how to drive. A candleLight adapter is no serial port;
+#: on Linux it shows up as a SocketCAN interface instead.
+SERIAL_ADAPTERS = {
+    (0x16D0, 0x117E): ("CANable 2.0 (slcan firmware)", "canable:{port}"),
+}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -84,3 +92,30 @@ def describe(interfaces: list[str], settings: CanSettings) -> str:
             f", data {data // 1000} kbit/s (BRS)" if data != settings.bitrate else ", no BRS"
         )
     return f"{' + '.join(interfaces)} ({rate})"
+
+
+def find_adapters() -> list[dict[str, Any]]:
+    """CAN adapters connected to this computer: USB serial adapters and SocketCAN interfaces (Linux)."""
+    from serial.tools import list_ports
+
+    found: list[dict[str, Any]] = []
+    for port in list_ports.comports():
+        known = SERIAL_ADAPTERS.get((port.vid or 0, port.pid or 0))
+        if known:
+            found.append(
+                {"device": port.device, "description": known[0], "interface": known[1].format(port=port.device)}
+            )
+    net = Path("/sys/class/net")
+    if net.is_dir():
+        for path in sorted(net.iterdir()):
+            try:
+                if (path / "type").read_text().strip() != "280":  # ARPHRD_CAN
+                    continue
+                state = (path / "operstate").read_text().strip()
+                fd = "CAN FD" if (path / "mtu").read_text().strip() == "72" else "Classic CAN"
+            except OSError:
+                continue
+            found.append(
+                {"device": path.name, "description": f"SocketCAN, {state}, {fd}", "interface": f"socketcan:{path.name}"}
+            )
+    return found

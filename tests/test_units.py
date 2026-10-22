@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 import uavcan.register
 
-from cymon_app import dsdl
+from cymon_app import __version__, dsdl
 from cymon_app.cli import _parser
 from cymon_app.registers import RegisterError, coerce, json_to_value, value_kind, value_to_json
 from cymon_app.subjects import flatten
@@ -67,3 +70,14 @@ def test_cli_parses_redundant_interfaces() -> None:
     assert args.iface == ["canable:/dev/ttyACM0", "canable:/dev/ttyACM1"]
     assert args.pnp == "cymon-pnp.db"
     assert args.bitrate == 1_000_000 and args.data_bitrate is None and not args.classic
+
+
+def test_cli_serve_without_interface() -> None:
+    assert _parser().parse_args(["serve"]).iface is None
+    assert _parser().parse_args([]).command is None  # main() runs serve --open
+
+
+def test_version_matches_pyproject() -> None:
+    """release-please bumps both; they must not drift apart."""
+    pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text()
+    assert re.search(r'^version = "(.+)"$', pyproject, re.MULTILINE)[1] == __version__  # type: ignore[index]

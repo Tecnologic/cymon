@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Command line: ``cymon serve``, ``cymon demo``, ``cymon adapters``, ``cymon dsdl``."""
+"""Command line: ``cymon serve``, ``cymon demo``, ``cymon adapters``, ``cymon dsdl``.
+
+``cymon`` alone is ``cymon serve --open`` without an interface: the web UI
+opens in the browser and connects from there. That is also what a double click
+on the executable does.
+"""
 
 from __future__ import annotations
 
@@ -9,19 +14,17 @@ import contextlib
 import logging
 import os
 import sys
+import traceback
 import webbrowser
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from . import __version__, dsdl
-from .transport import CanSettings, describe, make_transport
+from .transport import find_adapters
+
+if TYPE_CHECKING:
+    from .session import BusConfig
 
 _logger = logging.getLogger("cymon")
-
-#: USB IDs of CAN adapters cymon knows how to drive.
-_USB_ADAPTERS = {
-    (0x16D0, 0x117E): ("CANable 2.0 (slcan firmware)", "canable:{port}"),
-    (0x1D50, 0x606F): ("candleLight / gs_usb (CANable with candleLight firmware)", "socketcan:canX or gs_usb:{index}"),
-}
 
 
 def _dsdl_roots(args: argparse.Namespace) -> list[str]:
@@ -47,20 +50,21 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="cymon", description="Cyphal admin tool with a web UI")
+    parser = argparse.ArgumentParser(
+        prog="cymon", description="Cyphal admin tool with a web UI. Without a command: serve --open."
+    )
     parser.add_argument("--version", action="version", version=f"cymon {__version__}")
     parser.add_argument("-v", "--verbose", action="count", default=0)
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
 
-    serve = sub.add_parser("serve", help="connect to the bus and serve the web UI")
+    serve = sub.add_parser("serve", help="serve the web UI and connect to the bus (or choose the bus in the UI)")
     serve.add_argument(
         "-i",
         "--iface",
         action="append",
-        required=True,
         metavar="KIND:CHANNEL",
         help="canable:/dev/ttyACM0, canable:COM5, socketcan:can0, pcan:PCAN_USBBUS1, udp:127.0.0.1 ... "
-        "(repeat for a redundant bus)",
+        "(repeat for a redundant bus; omit to choose in the web UI)",
     )
     serve.add_argument("--node-id", type=int, default=127, help="node-ID of the tool (default 127)")
     serve.add_argument("--bitrate", type=int, default=1_000_000, help="nominal CAN bit rate (default 1000000)")
@@ -81,7 +85,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     _add_common(serve)
 
-    demo = sub.add_parser("demo", help="simulated device on a virtual bus, no hardware needed")
+    demo = sub.add_parser("demo", help="simulated devices on a virtual bus, no hardware needed")
     demo.add_argument("--devices", type=int, default=1, help="number of simulated devices (node-IDs 10, 11, ...)")
     _add_common(demo)
 
@@ -92,84 +96,54 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-async def _serve(args: argparse.Namespace, setup_bus: object) -> None:
+async def _serve(args: argparse.Namespace, config: BusConfig | None) -> None:
+    import pycyphal.transport
     import uvicorn
 
+    from .session import Session
     from .web.server import create_app
 
-    admin, extras = setup_bus()  # type: ignore[operator]
-    admin.start()
-    for extra in extras:
-        extra.start()
+    session = Session(dsdl_roots=_dsdl_roots(args))
+    if config is not None:
+        try:
+            await session.connect(config)
+        except (OSError, ValueError, pycyphal.transport.InvalidMediaConfigurationError) as ex:
+            raise SystemExit(f"cymon: cannot connect to {', '.join(config.interfaces)}: {ex}") from ex
     url = f"http://{'localhost' if args.host in ('127.0.0.1', '0.0.0.0') else args.host}:{args.port}"
-    _logger.info("Node-ID %s on %s", admin.node_id, admin.status()["transport"])
-    _logger.info("Web UI: %s", url)
+    _logger.info("Web UI: %s%s", url, "" if config else " (choose the bus there)")
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         _logger.warning("The web UI on %s lets anyone on that network command the bus.", args.host)
     if args.open:
         webbrowser.open(url)
-    config = uvicorn.Config(create_app(admin), host=args.host, port=args.port, log_level="warning")
+    web = uvicorn.Config(create_app(session), host=args.host, port=args.port, log_level="warning")
     try:
-        await uvicorn.Server(config).serve()
+        await uvicorn.Server(web).serve()
     finally:
-        for extra in extras:
-            extra.close()
-        admin.close()
+        session.close()
 
 
 def _cmd_serve(args: argparse.Namespace) -> None:
     dsdl.setup(_dsdl_roots(args))
-    settings = CanSettings(args.bitrate, args.data_bitrate, 8 if args.classic else 64)
+    from .session import BusConfig
 
-    def setup_bus() -> tuple[object, list[object]]:
-        from .admin import Admin
-
-        _logger.info("Bus: %s", describe(args.iface, settings))
-        transport = make_transport(args.iface, args.node_id, settings)
-        return Admin(transport, pnp_database=args.pnp), []
-
-    asyncio.run(_serve(args, setup_bus))
+    config = None
+    if args.iface:
+        config = BusConfig(args.iface, args.node_id, args.bitrate, args.data_bitrate, args.classic, args.pnp)
+    asyncio.run(_serve(args, config))
 
 
 def _cmd_demo(args: argparse.Namespace) -> None:
     dsdl.setup(_dsdl_roots(args))
+    from .session import BusConfig
 
-    def setup_bus() -> tuple[object, list[object]]:
-        from .admin import Admin
-        from .demo import DemoDevice
-
-        devices = [
-            DemoDevice(make_transport(["virtual:cymon-demo"], 10 + i), name=f"org.tecnologic.cymon.demo{i}")
-            for i in range(args.devices)
-        ]
-        return Admin(make_transport(["virtual:cymon-demo"], 127)), devices
-
-    asyncio.run(_serve(args, setup_bus))
+    asyncio.run(_serve(args, BusConfig(demo_devices=args.devices)))
 
 
 def _cmd_adapters(_: argparse.Namespace) -> None:
-    found = False
-    try:
-        from serial.tools import list_ports
-
-        gs_index = 0
-        for port in list_ports.comports():
-            known = _USB_ADAPTERS.get((port.vid or 0, port.pid or 0))
-            if known:
-                found = True
-                print(f"{port.device:20} {known[0]:50} -i {known[1].format(port=port.device, index=gs_index)}")
-    except ImportError:
-        pass
-    net = Path("/sys/class/net")
-    if net.is_dir():
-        for iface in sorted(net.iterdir()):
-            if (iface / "type").read_text().strip() == "280":  # ARPHRD_CAN
-                found = True
-                state = (iface / "operstate").read_text().strip()
-                mtu = (iface / "mtu").read_text().strip()
-                fd = "CAN FD" if mtu == "72" else "Classic CAN"
-                print(f"{iface.name:20} SocketCAN, {state}, {fd:41} -i socketcan:{iface.name}")
-    if not found:
+    adapters = find_adapters()
+    for adapter in adapters:
+        print(f"{adapter['device']:20} {adapter['description']:50} -i {adapter['interface']}")
+    if not adapters:
         print("No CAN adapter found. A CANable 2.0 shows up as a serial port (slcan firmware) or as a SocketCAN")
         print("interface (candleLight firmware, Linux). See the README, section 'CAN adapters'.")
 
@@ -179,15 +153,26 @@ def _cmd_dsdl(args: argparse.Namespace) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = _parser().parse_args(argv)
+    argv = sys.argv[1:] if argv is None else argv
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if args.command is None:
+        args = parser.parse_args([*argv, "serve", "--open"])
     level = logging.WARNING - 10 * min(args.verbose + 1, 2)
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s", stream=sys.stderr)
     if args.verbose < 2:
         for name in ("pycyphal", "pydsdl", "nunavut", "can"):
             logging.getLogger(name).setLevel(logging.WARNING)
     commands = {"serve": _cmd_serve, "demo": _cmd_demo, "adapters": _cmd_adapters, "dsdl": _cmd_dsdl}
-    with contextlib.suppress(KeyboardInterrupt):
-        commands[args.command](args)
+    try:
+        with contextlib.suppress(KeyboardInterrupt):
+            commands[args.command](args)
+    except Exception:
+        if argv or not getattr(sys, "frozen", False):
+            raise
+        # Started by a double click on the executable: keep the console window open to show the error.
+        traceback.print_exc()
+        input("Press Enter to close.")
 
 
 if __name__ == "__main__":

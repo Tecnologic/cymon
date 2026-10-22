@@ -25,27 +25,10 @@ jobs:
         run: pip install -e '.[dev]'
       - name: Lint
         run: |
-          ruff check src tests
-          ruff format --check src tests
+          ruff check src tests packaging
+          ruff format --check src tests packaging
       - name: Test (simulated device on a virtual CAN bus)
         run: pytest -q
 
-  wheel:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Build and smoke-test the wheel outside the source tree
-        run: |
-          pip wheel . --no-deps -w dist
-          python -m venv /tmp/wheel-venv
-          /tmp/wheel-venv/bin/pip install dist/*.whl
-          cd /tmp && /tmp/wheel-venv/bin/cymon dsdl && /tmp/wheel-venv/bin/cymon adapters
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheel
-          path: dist/*.whl
+  build:
+    uses: ./.github/workflows/build.yml

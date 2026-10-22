@@ -2,7 +2,7 @@
 
 ## Decision: host application instead of embedded firmware
 
-cymon 0.1 ran on an ESP32-S2 with an MCP2518FD and served the UI over WiFi.
+The first cymon ran on an ESP32-S2 with an MCP2518FD and served the UI over WiFi.
 With UNIMOC as the main device that design ran out of room:
 
 - An admin tool has to decode any DSDL type at run time: standard,
@@ -28,6 +28,8 @@ Two alternatives were considered and not chosen:
 ```
 browser ── HTTP/WebSocket ──> FastAPI (web/server.py)
                                   │
+                                Session (session.py) ── connect/disconnect at run time, DSDL loading
+                                  │
                                 Admin (admin.py) ── one pycyphal node, node-ID 127
                                   ├─ NodeTracker, heartbeat, port.List, diagnostic.Record
                                   ├─ RegisterClient (registers.py)  uavcan.register.List/Access
@@ -44,7 +46,12 @@ browser ── HTTP/WebSocket ──> FastAPI (web/server.py)
   and the publications.
 - DSDL is compiled at start-up by `dsdl.setup()`: `uavcan`, `reg`, `cymon`
   and the `--dsdl` roots. The cache is keyed by the content of the DSDL
-  and the pycyphal version.
+  and the pycyphal version. When the UI loads other roots, `setup()` runs
+  again and the extra namespaces are imported anew; `uavcan`, `reg` and
+  `cymon` stay loaded.
+- Without `-i`, the tool starts with no bus. The session creates the admin
+  node on connect and closes it on disconnect. The event hub belongs to the
+  session, so WebSockets survive a reconnect.
 - The UI is static HTML/JS (Alpine.js and uPlot, vendored). There is no
   Node.js build step, and it works offline.
 - Events (node changes, diagnostics, subject batches every 50 ms, capture

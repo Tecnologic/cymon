@@ -216,6 +216,3 @@ class ScopeClient:
     def _check(code: int, what: str) -> None:
         if int(code) != 0:
             raise ScopeError(f"{what} refused: {ERRORS.get(int(code), code)}")
-
-
-__all__ = ["TRIGGER_MODES", "CaptureRequest", "RegisterError", "ScopeClient", "ScopeError"]
