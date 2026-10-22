@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cymon</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 8h3l2-5 4 10 2-5h3' fill='none' stroke='%232d6cdf' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/uPlot.min.css">
+  <link rel="stylesheet" href="app.css">
+  <script src="vendor/uPlot.iife.min.js"></script>
+  <script src="app.js"></script>
+  <script defer src="vendor/alpine.min.js"></script>
+</head>
+<body x-data="cymon()" x-init="init()">
+<header>
+  <span class="brand">cymon</span>
+  <nav>
+    <template x-for="v in views" :key="v.id">
+      <button :class="{active: view === v.id}" @click="view = v.id" x-text="v.label"></button>
+    </template>
+  </nav>
+  <span class="bus" x-text="status ? `node ${status.node_id ?? 'anon'} · ${status.transport}` : ''" :title="status?.transport"></span>
+  <span class="dot" :class="connected ? 'ok' : 'bad'" :title="connected ? 'connected' : 'disconnected'"></span>
+  <button class="estop" @click="estop()" title="Stop all publications and send EMERGENCY_STOP to every online node">E-STOP</button>
+</header>
+
+<div class="toast" x-show="toast" x-text="toast" @click="toast = ''" x-transition></div>
+
+<!-- ───────────── Nodes ───────────── -->
+<main x-show="view === 'nodes'" class="split">
+  <section class="list">
+    <table>
+      <thead><tr><th>ID</th><th>Name</th><th>Health</th><th>Mode</th><th>Uptime</th><th>VSSC</th></tr></thead>
+      <tbody>
+        <template x-for="n in nodeList()" :key="n.node_id">
+          <tr :class="{sel: selected === n.node_id, offline: !n.online}" @click="selectNode(n.node_id)">
+            <td x-text="n.node_id"></td>
+            <td x-text="n.info?.name ?? '…'"></td>
+            <td><span class="badge" :class="n.online ? n.health : 'offline'" x-text="n.online ? n.health : 'offline'"></span></td>
+            <td x-text="n.mode"></td>
+            <td x-text="fmtUptime(n.uptime)"></td>
+            <td x-text="n.vssc"></td>
+          </tr>
+        </template>
+        <tr x-show="nodeList().length === 0"><td colspan="6" class="empty">No node on the bus yet.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="detail" x-show="selected !== null">
+    <template x-if="node()">
+      <div>
+        <h2 x-text="`${node().node_id} · ${node().info?.name ?? ''}`"></h2>
+        <dl class="info" x-show="node().info">
+          <dt>Software</dt><dd x-text="node().info?.software_version + ' · ' + node().info?.software_vcs_revision_id"></dd>
+          <dt>Hardware</dt><dd x-text="node().info?.hardware_version"></dd>
+          <dt>Unique-ID</dt><dd class="mono" x-text="node().info?.unique_id"></dd>
+        </dl>
+        <div class="row">
+          <button @click="command('restart')">Restart</button>
+          <button @click="command('store_persistent_states')">Store</button>
+          <button @click="confirm('Factory reset node ' + selected + '?') && command('factory_reset')">Factory reset</button>
+          <button class="danger" @click="command('emergency_stop')">Emergency stop</button>
+          <input class="narrow" type="number" placeholder="cmd" x-model.number="customCommand">
+          <button @click="command(customCommand)" :disabled="customCommand === ''">Send</button>
+        </div>
+
+        <h3>Ports <button class="small" @click="loadPorts()">load</button></h3>
+        <table x-show="ports.length" class="compact">
+          <thead><tr><th>Dir</th><th>Name</th><th>ID</th><th>Type</th><th></th></tr></thead>
+          <tbody>
+            <template x-for="p in ports" :key="p.direction + p.name">
+              <tr>
+                <td x-text="p.direction"></td><td x-text="p.name"></td><td x-text="p.id ?? '—'"></td>
+                <td class="mono" x-text="p.type ?? ''"></td>
+                <td>
+                  <button class="small" x-show="p.direction === 'pub' && p.id !== null && p.type" @click="monitor(p.id, p.type)">monitor</button>
+                  <button class="small" x-show="p.direction === 'sub' && p.id !== null && p.type" @click="preparePublish(p.id, p.type)">publish</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+
+        <h3>Registers
+          <button class="small" @click="loadRegisters()" x-text="loadingRegisters ? 'loading…' : 'load'"></button>
+          <input class="filter" placeholder="filter" x-model="registerFilter">
+        </h3>
+        <table class="compact registers" x-show="registers.length">
+          <thead><tr><th>Name</th><th>Type</th><th>Value</th><th></th></tr></thead>
+          <tbody>
+            <template x-for="r in filteredRegisters()" :key="r.name">
+              <tr>
+                <td class="mono" x-text="r.name"></td>
+                <td x-text="r.kind + (r.persistent ? ' · P' : '') + (r.mutable ? '' : ' · RO')"></td>
+                <td>
+                  <input x-show="r.mutable" x-model="r.edit" @keydown.enter="writeRegister(r)" :class="{dirty: r.edit !== fmtValue(r.value)}">
+                  <span x-show="!r.mutable" class="mono" x-text="fmtValue(r.value)"></span>
+                </td>
+                <td><button class="small" x-show="r.mutable" @click="writeRegister(r)">set</button></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </section>
+</main>
+
+<!-- ───────────── Monitor ───────────── -->
+<main x-show="view === 'monitor'">
+  <div class="row">
+    <input class="narrow" type="number" placeholder="subject-ID" x-model.number="subForm.subject_id">
+    <input list="types" class="wide" placeholder="type, e.g. unimoc.drive.Telemetry.0.1" x-model="subForm.type">
+    <label>window <input class="narrow" type="number" x-model.number="windowSeconds"> s</label>
+    <button @click="monitor(subForm.subject_id, subForm.type)">Monitor</button>
+  </div>
+  <template x-for="s in subscriptions" :key="s.id">
+    <div class="card">
+      <div class="card-head">
+        <b x-text="`${s.subject_id} · ${s.type}`"></b>
+        <span x-text="`${s.count} msgs`"></span>
+        <button class="small" @click="s.paused = !s.paused" x-text="s.paused ? 'resume' : 'pause'"></button>
+        <button class="small" @click="unmonitor(s)">close</button>
+      </div>
+      <div class="fields">
+        <template x-for="f in s.fieldNames" :key="f">
+          <label><input type="checkbox" :checked="s.shown.includes(f)" @change="toggleField(s, f)"> <span x-text="f"></span>
+            <span class="mono" x-text="fmtNum(s.lastValues[f])"></span></label>
+        </template>
+      </div>
+      <div class="plot" :id="'plot-' + s.id"></div>
+    </div>
+  </template>
+</main>
+
+<!-- ───────────── Publish ───────────── -->
+<main x-show="view === 'publish'">
+  <p class="hint">Publications stop by themselves when this page closes or loses the connection for longer than the lease.</p>
+  <div class="row">
+    <input class="narrow" type="number" placeholder="subject-ID" x-model.number="pubForm.subject_id">
+    <input list="types" class="wide" placeholder="type" x-model="pubForm.type" @change="loadTemplate()">
+    <label>rate <input class="narrow" type="number" x-model.number="pubForm.rate_hz"> Hz</label>
+    <label>lease <input class="narrow" type="number" step="0.1" x-model.number="pubForm.lease_s"> s</label>
+  </div>
+  <textarea class="json" rows="8" x-model="pubForm.value" spellcheck="false"></textarea>
+  <div class="row">
+    <button @click="startPublish()">Start</button>
+    <button class="danger" @click="stopAllPublish()">Stop all</button>
+  </div>
+  <table class="compact">
+    <thead><tr><th>#</th><th>Subject</th><th>Type</th><th>Rate</th><th>Sent</th><th>Value</th><th></th></tr></thead>
+    <tbody>
+      <template x-for="p in publications" :key="p.id">
+        <tr>
+          <td x-text="p.id"></td><td x-text="p.subject_id"></td><td class="mono" x-text="p.type"></td>
+          <td x-text="p.rate_hz"></td><td x-text="p.sent"></td>
+          <td><input class="wide mono" x-model="p.edit" @keydown.enter="updatePublish(p)"></td>
+          <td><button class="small" @click="updatePublish(p)">set</button>
+              <button class="small danger" @click="stopPublish(p)">stop</button></td>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+</main>
+
+<!-- ───────────── Scope ───────────── -->
+<main x-show="view === 'scope'" class="split">
+  <section class="list">
+    <label>Node
+      <select x-model.number="scope.node" @change="loadScope()">
+        <option value="">—</option>
+        <template x-for="n in nodeList()" :key="n.node_id">
+          <option :value="n.node_id" x-text="`${n.node_id} · ${n.info?.name ?? ''}`"></option>
+        </template>
+      </select>
+    </label>
+    <p class="hint" x-show="scope.error" x-text="scope.error"></p>
+    <template x-if="scope.info">
+      <div>
+        <p class="hint" x-text="`${scope.info.buffer.buffer_bytes} B buffer, ${scope.info.buffer.max_channels} channels, tick ${scope.info.buffer.tick_period_us} µs`"></p>
+        <div class="vars">
+          <template x-for="v in scope.info.variables" :key="v.id">
+            <label><input type="checkbox" :value="v.id" x-model.number="scope.channels"> <span x-text="v.name"></span> <span class="unit" x-text="v.unit"></span></label>
+          </template>
+        </div>
+        <div class="form">
+          <label>period [µs] <input type="number" x-model.number="scope.period"></label>
+          <label>samples <input type="number" x-model.number="scope.samples"></label>
+          <label>pre-trigger <input type="number" x-model.number="scope.pretrigger"></label>
+          <label>trigger
+            <select x-model="scope.mode"><option>immediate</option><option>rising</option><option>falling</option><option>hysteresis</option></select></label>
+          <label x-show="scope.mode !== 'immediate'">source
+            <select x-model.number="scope.source">
+              <template x-for="v in scope.info.variables" :key="v.id"><option :value="v.id" x-text="v.name"></option></template>
+            </select></label>
+          <label x-show="scope.mode !== 'immediate'">level <input type="number" step="any" x-model.number="scope.level"></label>
+          <label x-show="scope.mode === 'hysteresis'">band <input type="number" step="any" x-model.number="scope.band"></label>
+          <label class="inline"><input type="checkbox" x-model="scope.repeat"> repeat until stopped</label>
+        </div>
+        <p class="hint" x-text="`max ${maxSamples()} samples with ${scope.channels.length || 1} channel(s)`"></p>
+        <div class="row">
+          <button @click="capture()" :disabled="scope.busy || !scope.channels.length">Capture</button>
+          <button @click="scope.repeat = false; disarm()">Stop</button>
+          <button @click="exportCsv()" :disabled="!scope.result">CSV</button>
+          <span x-text="scope.state"></span>
+        </div>
+      </div>
+    </template>
+  </section>
+  <section class="detail"><div id="scope-plot" class="plot tall"></div></section>
+</main>
+
+<!-- ───────────── Log ───────────── -->
+<main x-show="view === 'log'">
+  <div class="row">
+    <select x-model="logLevel"><option>trace</option><option>debug</option><option>info</option><option>notice</option><option>warning</option><option>error</option></select>
+    <input class="narrow" type="number" placeholder="node" x-model.number="logNode">
+    <button @click="diagnostics = []">Clear</button>
+  </div>
+  <table class="compact log">
+    <thead><tr><th>Time</th><th>Node</th><th>Severity</th><th>Text</th></tr></thead>
+    <tbody>
+      <template x-for="(d, i) in filteredLog()" :key="i">
+        <tr :class="d.severity"><td x-text="fmtTime(d.t)"></td><td x-text="d.node_id"></td><td x-text="d.severity"></td><td class="mono" x-text="d.text"></td></tr>
+      </template>
+    </tbody>
+  </table>
+</main>
+
+<datalist id="types"><template x-for="t in types" :key="t"><option :value="t"></option></template></datalist>
+</body>
+</html>
