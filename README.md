@@ -29,6 +29,7 @@ and serves a web UI on the same computer:
   trigger (rising, falling, hysteresis, immediate), pre-trigger, decimation,
   plot and CSV export.
 - **Log**: the `uavcan.diagnostic.Record` messages of all nodes.
+- **Theme**: dark by default; the ☀/☾ button in the header switches to light (remembered per browser).
 - **E-STOP**: stops all publications and sends EMERGENCY_STOP to every
   online node.
 - **Plug-and-play**: an optional node-ID allocator (`--pnp`).

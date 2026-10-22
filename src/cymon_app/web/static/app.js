@@ -15,6 +15,9 @@ function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* not stored */ }
 }
 
+// Dark unless switched to light; set before the page renders, so it does not flash.
+document.documentElement.dataset.theme = loadSaved('cymon.theme', 'dark');
+
 async function api(method, path, body) {
   const res = await fetch(path, {
     method,
@@ -36,7 +39,7 @@ function makePlot(el, labels, height) {
     width, height,
     scales: { x: { time: false } },
     series: [{ label: 't [s]' }, ...labels.map((l, i) => ({ label: l, stroke: COLORS[i % COLORS.length], width: 1.5 }))],
-    axes: [{ stroke: '#888' }, { stroke: '#888' }],
+    axes: [0, 1].map(() => ({ stroke: '#888', grid: { stroke: 'rgba(128,128,128,.2)' }, ticks: { stroke: 'rgba(128,128,128,.3)' } })),
     legend: { live: true },
   };
   el.innerHTML = '';
@@ -53,6 +56,7 @@ window.cymon = function () {
     connected: false,
     status: null,
     toast: '',
+    theme: document.documentElement.dataset.theme,
     busy: '',
     bitrates: BITRATES,
     busForm: {
@@ -144,6 +148,12 @@ window.cymon = function () {
         case 'publisher': this.onPublisher(e); break;
         case 'capture': this.scope.state = e.state; break;
       }
+    },
+
+    toggleTheme() {
+      this.theme = this.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = this.theme;
+      save('cymon.theme', this.theme);
     },
 
     notify(e) { this.toast = String(e.message ?? e); setTimeout(() => { this.toast = ''; }, 6000); },

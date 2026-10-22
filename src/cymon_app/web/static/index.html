@@ -22,6 +22,7 @@
   </nav>
   <span class="bus" x-text="!status ? '' : status.connected ? `node ${status.node_id ?? 'anon'} · ${status.transport}` : 'not connected'" :title="status?.transport"></span>
   <span class="dot" :class="connected && status?.connected ? 'ok' : 'bad'" :title="!connected ? 'no connection to cymon' : status?.connected ? 'connected to the bus' : 'not connected to a bus'"></span>
+  <button class="small theme" @click="toggleTheme()" :title="theme === 'dark' ? 'Light theme' : 'Dark theme'" x-text="theme === 'dark' ? '☀' : '☾'"></button>
   <button class="estop" @click="estop()" title="Stop all publications and send EMERGENCY_STOP to every online node">E-STOP</button>
 </header>
 

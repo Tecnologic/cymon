@@ -4,8 +4,9 @@
   --ok: #2e9d4f; --warn: #d79a00; --bad: #d1352b; --sel: #e8f0fe;
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #161618; --fg: #e8e8ea; --muted: #9a9aa0; --line: #333338; --panel: #1f1f22; --accent: #6b9cff; --sel: #23324d; }
+:root[data-theme="dark"] {
+  --bg: #161618; --fg: #e8e8ea; --muted: #9a9aa0; --line: #333338; --panel: #1f1f22; --accent: #6b9cff; --sel: #23324d;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); }
@@ -15,6 +16,7 @@ nav { display: flex; gap: 4px; }
 nav button { background: none; border: none; color: var(--muted); padding: 6px 10px; border-radius: 6px; }
 nav button.active { color: var(--fg); background: var(--sel); }
 .bus { margin-left: auto; color: var(--muted); font-size: 12px; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.theme { padding: 2px 8px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; }
 .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
 button { font: inherit; cursor: pointer; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
