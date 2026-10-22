@@ -11,20 +11,102 @@
   <script src="app.js"></script>
   <script defer src="vendor/alpine.min.js"></script>
 </head>
-<body x-data="cymon()" x-init="init()">
+<body x-data="cymon()">
 <header>
   <span class="brand">cymon</span>
+  <span class="version" x-text="status?.version ?? ''"></span>
   <nav>
     <template x-for="v in views" :key="v.id">
       <button :class="{active: view === v.id}" @click="view = v.id" x-text="v.label"></button>
     </template>
   </nav>
-  <span class="bus" x-text="status ? `node ${status.node_id ?? 'anon'} · ${status.transport}` : ''" :title="status?.transport"></span>
-  <span class="dot" :class="connected ? 'ok' : 'bad'" :title="connected ? 'connected' : 'disconnected'"></span>
+  <span class="bus" x-text="!status ? '' : status.connected ? `node ${status.node_id ?? 'anon'} · ${status.transport}` : 'not connected'" :title="status?.transport"></span>
+  <span class="dot" :class="connected && status?.connected ? 'ok' : 'bad'" :title="!connected ? 'no connection to cymon' : status?.connected ? 'connected to the bus' : 'not connected to a bus'"></span>
   <button class="estop" @click="estop()" title="Stop all publications and send EMERGENCY_STOP to every online node">E-STOP</button>
 </header>
 
 <div class="toast" x-show="toast" x-text="toast" @click="toast = ''" x-transition></div>
+<p class="banner" x-show="status && !status.connected && view !== 'bus'">Not connected. <button class="small" @click="view = 'bus'">Choose a bus</button></p>
+
+<!-- ───────────── Bus ───────────── -->
+<main x-show="view === 'bus'" class="split">
+  <section class="list">
+    <h2>Interface</h2>
+    <div class="form">
+      <label class="wide-field">source
+        <select x-model="busForm.source">
+          <option value="adapter">CAN adapter</option>
+          <option value="demo">Demo (simulated devices, no hardware)</option>
+        </select></label>
+      <template x-if="busForm.source === 'adapter'">
+        <div class="wide-field">
+          <label class="stack">interface <span class="hint">(several: redundant bus)</span></label>
+          <template x-for="(iface, i) in busForm.interfaces" :key="i">
+            <div class="row tight">
+              <input class="wide mono" x-model="busForm.interfaces[i]" list="iface-examples" placeholder="kind:channel">
+              <button class="small" @click="busForm.interfaces.splice(i, 1)" x-show="busForm.interfaces.length > 1">remove</button>
+            </div>
+          </template>
+          <div class="row tight">
+            <button class="small" @click="busForm.interfaces.push('')">add interface</button>
+            <button class="small" @click="loadAdapters()" x-text="loadingAdapters ? 'searching…' : 'search adapters'"></button>
+          </div>
+          <template x-for="a in adapters" :key="a.interface">
+            <div class="row tight">
+              <button class="small" @click="useAdapter(a)">use</button>
+              <span class="mono" x-text="a.interface"></span><span class="hint" x-text="a.description"></span>
+            </div>
+          </template>
+          <p class="hint" x-show="adaptersSearched && !adapters.length">No adapter found. Enter the interface by hand, e.g. <span class="mono">canable:COM5</span>.</p>
+        </div>
+      </template>
+      <label x-show="busForm.source === 'demo'">devices <input type="number" min="1" max="16" x-model.number="busForm.demo_devices"></label>
+      <template x-if="busForm.source === 'adapter'">
+        <div class="form wide-field">
+          <label>bit rate
+            <select x-model.number="busForm.bitrate">
+              <template x-for="r in bitrates" :key="r"><option :value="r" x-text="`${r / 1000} kbit/s`" :selected="r === busForm.bitrate"></option></template>
+            </select></label>
+          <label>data bit rate (CAN FD)
+            <select x-model="busForm.data_bitrate" :disabled="busForm.classic">
+              <option value="">no bit rate switch</option>
+              <option value="2000000">2 Mbit/s</option>
+              <option value="4000000">4 Mbit/s</option>
+              <option value="5000000">5 Mbit/s</option>
+              <option value="8000000">8 Mbit/s</option>
+            </select></label>
+          <label class="inline"><input type="checkbox" x-model="busForm.classic"> Classic CAN (MTU 8)</label>
+        </div>
+      </template>
+      <label>node-ID of the tool <input type="number" min="0" max="127" x-model.number="busForm.node_id"></label>
+      <label>plug-and-play database <input placeholder="off" x-model="busForm.pnp" title="Run the node-ID allocator with this database file, e.g. cymon-pnp.db"></label>
+    </div>
+    <div class="row">
+      <button class="primary" @click="connectBus()" :disabled="!!busy" x-text="status?.connected ? 'Reconnect' : 'Connect'"></button>
+      <button @click="disconnectBus()" :disabled="busy || !status?.connected">Disconnect</button>
+      <span class="hint" x-text="busy"></span>
+    </div>
+    <p class="hint" x-show="status?.connected" x-text="`Connected: node ${status?.node_id} on ${status?.transport}`"></p>
+  </section>
+
+  <section class="detail">
+    <h2>DSDL</h2>
+    <p class="hint">Root namespace directories of your own types, e.g. <span class="mono">unimoc/dsdl/unimoc</span>.
+      The standard types and <span class="mono">cymon</span> are always loaded. The first load compiles the DSDL, which takes a few seconds.</p>
+    <table class="compact" x-show="dsdlRoots.length">
+      <tbody>
+        <template x-for="(root, i) in dsdlRoots" :key="root">
+          <tr><td class="mono" x-text="root"></td><td><button class="small" @click="removeDsdl(i)" :disabled="!!busy">remove</button></td></tr>
+        </template>
+      </tbody>
+    </table>
+    <div class="row">
+      <input class="wide mono" placeholder="path to a root namespace directory" x-model="dsdlPath" @keydown.enter="addDsdl()">
+      <button @click="addDsdl()" :disabled="busy || !dsdlPath.trim()">Load</button>
+    </div>
+    <p class="hint" x-text="'Namespaces: ' + (status?.dsdl?.namespaces ?? []).join(', ')"></p>
+  </section>
+</main>
 
 <!-- ───────────── Nodes ───────────── -->
 <main x-show="view === 'nodes'" class="split">
@@ -228,6 +310,11 @@
   </table>
 </main>
 
+<datalist id="iface-examples">
+  <option value="canable:/dev/ttyACM0"></option><option value="canable:COM5"></option><option value="socketcan:can0"></option>
+  <option value="socketcan:vcan0"></option><option value="slcan:/dev/ttyACM0"></option><option value="pcan:PCAN_USBBUS1"></option>
+  <option value="gs_usb:0"></option><option value="udp:127.0.0.1"></option>
+</datalist>
 <datalist id="types"><template x-for="t in types" :key="t"><option :value="t"></option></template></datalist>
 </body>
 </html>

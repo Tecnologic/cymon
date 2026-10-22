@@ -26,6 +26,8 @@ _PACKAGE_DIR = Path(__file__).resolve().parent
 _REPO_DIR = _PACKAGE_DIR.parent.parent
 
 _compiled_roots: list[Path] = []
+_path_entry: str | None = None
+_message_types: list[str] = []
 
 
 def default_roots() -> list[Path]:
@@ -60,30 +62,74 @@ def _fingerprint(roots: Iterable[Path]) -> str:
     return digest.hexdigest()[:16]
 
 
-def setup(extra_roots: Iterable[str | Path] = (), output_dir: Path | None = None) -> Path:
-    """Compiles the DSDL (once per content) and makes it importable. Returns the package directory."""
-    import pycyphal.dsdl
-
-    roots = default_roots() + [Path(r).resolve() for r in extra_roots]
+def _resolve(extra_roots: Iterable[str | Path]) -> list[Path]:
+    roots = default_roots()
+    for extra in extra_roots:
+        root = Path(extra).expanduser().resolve()
+        if not root.is_dir():
+            raise ValueError(f"DSDL root namespace {extra} is not a directory")
+        if not any(root.rglob("*.dsdl")):
+            raise ValueError(f"DSDL root namespace {extra} contains no .dsdl file")
+        roots.append(root)
     names = [r.name for r in roots]
     duplicates = {n for n in names if names.count(n) > 1}
     if duplicates:
         raise ValueError(f"DSDL root namespace given twice: {', '.join(sorted(duplicates))}")
+    return roots
+
+
+def _compile(roots: list[Path], output_dir: Path | None) -> Path:
+    import pycyphal.dsdl
 
     out = (output_dir or cache_dir()) / _fingerprint(roots)
     if not (out / ".complete").exists():
-        _logger.info("Compiling DSDL %s into %s (first start only)", names, out)
+        _logger.info("Compiling DSDL %s into %s (first time only)", [r.name for r in roots], out)
         pycyphal.dsdl.compile_all(roots, out)
         (out / ".complete").touch()
-    if str(out) not in sys.path:
-        sys.path.insert(0, str(out))
+    return out
+
+
+def compile_roots(extra_roots: Iterable[str | Path] = (), output_dir: Path | None = None) -> Path:
+    """Compiles the DSDL (once per content) without making it importable. Returns the package directory."""
+    return _compile(_resolve(extra_roots), output_dir)
+
+
+def setup(extra_roots: Iterable[str | Path] = (), output_dir: Path | None = None) -> Path:
+    """Compiles the DSDL (once per content) and makes it importable. Returns the package directory."""
+    global _path_entry
+    roots = _resolve(extra_roots)
+    out = _compile(roots, output_dir)
+    if _path_entry in sys.path:
+        sys.path.remove(_path_entry)
+    sys.path.insert(0, str(out))
+    _path_entry = str(out)
+    # Extra namespaces may have changed on disk: import them again from the new directory.
+    defaults = {r.name for r in default_roots()}
+    for name in {r.name for r in _compiled_roots + roots} - defaults:
+        for module in [m for m in sys.modules if m == name or m.startswith(name + ".")]:
+            del sys.modules[module]
+    importlib.invalidate_caches()
     _compiled_roots[:] = roots
+    _message_types.clear()
     return out
 
 
 def namespaces() -> list[str]:
     """Root namespaces compiled by :func:`setup`."""
     return [r.name for r in _compiled_roots]
+
+
+def message_types() -> list[str]:
+    """Full names of all message types (no services) in the namespaces of :func:`setup`."""
+    import pydsdl
+
+    if not _message_types:
+        for root in _compiled_roots:
+            for t in pydsdl.read_namespace(root, [r for r in _compiled_roots if r != root]):
+                if not isinstance(t, pydsdl.ServiceType):
+                    _message_types.append(f"{t.full_name}.{t.version.major}.{t.version.minor}")
+        _message_types.sort()
+    return list(_message_types)
 
 
 def find_type(full_name: str) -> type[Any]:

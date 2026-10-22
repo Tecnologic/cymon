@@ -100,8 +100,9 @@ class Admin:
         name: str = "org.tecnologic.cymon",
         pnp_database: Path | str | None = None,
         unique_id: bytes | None = None,
+        events: EventHub | None = None,
     ) -> None:
-        self.events = EventHub()
+        self.events = events or EventHub()
         info = uavcan.node.GetInfo_1.Response(
             protocol_version=uavcan.node.Version_1(1, 0),
             software_version=uavcan.node.Version_1(*map(int, __version__.split(".")[:2])),

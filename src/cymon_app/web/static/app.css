@@ -27,6 +27,7 @@ input.narrow { width: 90px; } input.wide { width: 320px; } input.filter { width:
 input.dirty { border-color: var(--warn); }
 main { padding: 16px; }
 .split { display: grid; grid-template-columns: minmax(420px, 1fr) 2fr; gap: 16px; align-items: start; }
+.split > section { min-width: 0; overflow-x: auto; }
 .list, .detail, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 .card { margin-top: 12px; }
 .card-head { display: flex; gap: 12px; align-items: center; }
@@ -59,3 +60,10 @@ textarea.json { width: 100%; font-family: ui-monospace, monospace; font-size: 12
 .toast { position: fixed; bottom: 16px; right: 16px; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; max-width: 480px; z-index: 3; cursor: pointer; }
 .u-legend { font-size: 12px; }
 @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+.version { color: var(--muted); font-size: 12px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.banner { margin: 0; padding: 8px 16px; background: var(--sel); color: var(--fg); }
+.row.tight { margin: 4px 0; }
+.form .wide-field { grid-column: span 2; }
+.form label.stack { flex-direction: row; gap: 6px; }
+section h2 { margin-bottom: 8px; }

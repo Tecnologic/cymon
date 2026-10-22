@@ -5,4 +5,4 @@ The DSDL namespace ``cymon`` (cymon-lib) is compiled into a Python package of
 that name, so this package is called ``cymon_app``.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.1.0"  # x-release-please-version

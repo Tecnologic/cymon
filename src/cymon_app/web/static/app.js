@@ -5,6 +5,15 @@
 const SEVERITIES = ['trace', 'debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert'];
 const COLORS = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7'];
 const CLIENT_ID = Math.random().toString(16).slice(2);
+const BITRATES = [10000, 20000, 50000, 83333, 100000, 125000, 250000, 500000, 750000, 1000000];
+
+// The bus form and the DSDL list survive restarts in this browser; storage can be unavailable (private mode).
+function loadSaved(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+}
+function save(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* not stored */ }
+}
 
 async function api(method, path, body) {
   const res = await fetch(path, {
@@ -37,13 +46,24 @@ function makePlot(el, labels, height) {
 window.cymon = function () {
   return {
     views: [
-      { id: 'nodes', label: 'Nodes' }, { id: 'monitor', label: 'Monitor' }, { id: 'publish', label: 'Publish' },
+      { id: 'bus', label: 'Bus' }, { id: 'nodes', label: 'Nodes' }, { id: 'monitor', label: 'Monitor' }, { id: 'publish', label: 'Publish' },
       { id: 'scope', label: 'Scope' }, { id: 'log', label: 'Log' },
     ],
     view: 'nodes',
     connected: false,
     status: null,
     toast: '',
+    busy: '',
+    bitrates: BITRATES,
+    busForm: {
+      source: 'adapter', interfaces: [''], bitrate: 1000000, data_bitrate: '', classic: false, node_id: 127, pnp: '',
+      demo_devices: 1, ...loadSaved('cymon.bus', {}),
+    },
+    adapters: [],
+    adaptersSearched: false,
+    loadingAdapters: false,
+    dsdlRoots: [],
+    dsdlPath: '',
     nodes: {},
     selected: null,
     ports: [],
@@ -65,16 +85,42 @@ window.cymon = function () {
     logLevel: 'info',
     logNode: '',
 
-    async init() {
+    async init() {  // called by Alpine
       this.connect();
       setInterval(() => { if (this.connected) this.ws.send(JSON.stringify({ type: 'renew' })); }, 250);
       try {
-        this.status = await api('GET', '/api/status');
-        for (const n of await api('GET', '/api/nodes')) this.nodes[n.node_id] = n;
-        this.diagnostics = await api('GET', '/api/diagnostics');
-        this.publications = (await api('GET', '/api/publishers')).map(p => ({ ...p, edit: JSON.stringify(p.value) }));
-        this.types = await api('GET', '/api/types');
+        await this.setStatus(await api('GET', '/api/status'));
+        if (!this.status.connected) {
+          this.view = 'bus';
+          this.loadAdapters();
+          const saved = loadSaved('cymon.dsdl', []);
+          if (!this.dsdlRoots.length && saved.length) this.setDsdl(saved);
+        }
       } catch (e) { this.notify(e); }
+    },
+
+    // Applies a new session status; on a new connection or new DSDL, reloads what depends on it.
+    async setStatus(status) {
+      const old = this.status;
+      this.status = status;
+      this.dsdlRoots = [...status.dsdl.roots];
+      const reconnected = status.connected && old?.connection !== status.connection;
+      if (!old || old.dsdl.namespaces.join() !== status.dsdl.namespaces.join() || old.dsdl.roots.join() !== status.dsdl.roots.join()) {
+        this.types = await api('GET', '/api/types').catch(() => []);
+      }
+      if (!status.connected || reconnected) {
+        this.nodes = {}; this.selected = null; this.ports = []; this.registers = [];
+        this.diagnostics = []; this.publications = []; this.scope.node = ''; this.scope.info = null;
+        for (const s of this.subscriptions) { if (plots[s.id]) plots[s.id].destroy(); delete plots[s.id]; delete series[s.id]; }
+        this.subscriptions = [];
+      }
+      if (reconnected) {
+        try {
+          for (const n of await api('GET', '/api/nodes')) this.nodes[n.node_id] = n;
+          this.diagnostics = await api('GET', '/api/diagnostics');
+          this.publications = (await api('GET', '/api/publishers')).map(p => ({ ...p, edit: JSON.stringify(p.value) }));
+        } catch (e) { this.notify(e); }
+      }
     },
 
     connect() {
@@ -87,7 +133,7 @@ window.cymon = function () {
 
     onEvent(e) {
       switch (e.kind) {
-        case 'hello': this.status = e.status; break;
+        case 'hello': case 'session': this.setStatus(e.status); break;
         case 'node': this.nodes[e.node.node_id] = e.node; break;
         case 'heartbeat': if (this.nodes[e.node_id]) this.nodes[e.node_id].uptime = e.uptime; break;
         case 'diagnostic':
@@ -101,6 +147,53 @@ window.cymon = function () {
     },
 
     notify(e) { this.toast = String(e.message ?? e); setTimeout(() => { this.toast = ''; }, 6000); },
+
+    // ── Bus ────────────────────────────────────────────────────────────────
+    async loadAdapters() {
+      this.loadingAdapters = true;
+      try { this.adapters = await api('GET', '/api/adapters'); } catch (e) { this.notify(e); }
+      this.loadingAdapters = false;
+      this.adaptersSearched = true;
+      const f = this.busForm;
+      if (this.adapters.length && !f.interfaces.some(i => i.trim())) f.interfaces = [this.adapters[0].interface];
+    },
+    useAdapter(a) {
+      const f = this.busForm;
+      const empty = f.interfaces.findIndex(i => !i.trim());
+      if (f.interfaces.includes(a.interface)) return;
+      if (empty >= 0) f.interfaces[empty] = a.interface; else f.interfaces.push(a.interface);
+    },
+    async connectBus() {
+      const f = this.busForm;
+      save('cymon.bus', f);
+      const demo = f.source === 'demo';
+      this.busy = 'connecting…';
+      try {
+        await api('POST', '/api/connect', {
+          interfaces: demo ? [] : f.interfaces.map(i => i.trim()).filter(Boolean),
+          node_id: f.node_id, bitrate: f.bitrate, data_bitrate: f.data_bitrate === '' ? null : Number(f.data_bitrate),
+          classic: f.classic, pnp: f.pnp.trim() || null, demo_devices: demo ? f.demo_devices : 0,
+        });
+        this.view = 'nodes';
+      } catch (e) { this.notify(e); }
+      this.busy = '';
+    },
+    async disconnectBus() {
+      this.busy = 'disconnecting…';
+      try { await api('POST', '/api/disconnect'); } catch (e) { this.notify(e); }
+      this.busy = '';
+    },
+    async setDsdl(roots) {
+      this.busy = 'loading DSDL…';
+      try {
+        const loaded = await api('PUT', '/api/dsdl', { roots });
+        save('cymon.dsdl', loaded.roots);
+        this.dsdlPath = '';
+      } catch (e) { this.notify(e); }
+      this.busy = '';
+    },
+    addDsdl() { if (this.dsdlPath.trim()) this.setDsdl([...this.dsdlRoots, this.dsdlPath.trim()]); },
+    removeDsdl(i) { this.setDsdl(this.dsdlRoots.filter((_, j) => j !== i)); },
 
     // ── Nodes ──────────────────────────────────────────────────────────────
     nodeList() { return Object.values(this.nodes).sort((a, b) => a.node_id - b.node_id); },

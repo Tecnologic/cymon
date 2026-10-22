@@ -1,0 +1,78 @@
+name: Build
+
+# Executables for Linux and Windows plus the wheel. Called by CI (pull
+# requests) and by Release, which attaches the files to the GitHub release.
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: Name the files by the version alone (no commit)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  executable:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported runner: the Linux binary needs at least its glibc (2.35).
+          - os: ubuntu-22.04
+            platform: linux-x86_64
+            exe: cymon
+          - os: windows-2022
+            platform: windows-x86_64
+            exe: cymon.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install . "pyinstaller>=6.10,<7"
+      - name: Build
+        run: pyinstaller --noconfirm packaging/cymon.spec
+      - name: Smoke test (no bus, then the simulated devices)
+        run: python packaging/smoke_test.py dist/${{ matrix.exe }}
+      - name: Name by version and platform
+        id: name
+        shell: bash
+        run: |
+          version=$(python -c "import cymon_app; print(cymon_app.__version__)")
+          if [[ "${{ inputs.release }}" != "true" ]]; then version="${version}-g$(git rev-parse --short HEAD)"; fi
+          ext="${{ matrix.exe }}"; ext="${ext#cymon}"
+          file="cymon-${version}-${{ matrix.platform }}${ext}"
+          mv "dist/${{ matrix.exe }}" "dist/${file}"
+          echo "file=${file}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cymon-${{ matrix.platform }}
+          path: dist/${{ steps.name.outputs.file }}
+          if-no-files-found: error
+
+  wheel:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build and smoke-test the wheel outside the source tree
+        run: |
+          pip wheel . --no-deps -w dist
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install dist/*.whl
+          cd /tmp && /tmp/wheel-venv/bin/cymon dsdl && /tmp/wheel-venv/bin/cymon adapters
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cymon-wheel
+          path: dist/*.whl
+          if-no-files-found: error

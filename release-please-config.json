@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "python",
+  "include-component-in-tag": false,
+  "bootstrap-sha": "624f350320f8e7a4ab6ad6f9c3c56ea84169d4c1",
+  "packages": {
+    ".": {
+      "package-name": "cymon",
+      "bump-minor-pre-major": true,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["src/cymon_app/__init__.py"]
+    }
+  }
+}
