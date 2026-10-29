@@ -3,6 +3,26 @@
 [![CI](https://github.com/Tecnologic/cymon/actions/workflows/ci.yml/badge.svg)](https://github.com/Tecnologic/cymon/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Tecnologic/cymon)](https://github.com/Tecnologic/cymon/releases/latest)
 
+> [!IMPORTANT]
+> **cymon has moved into [cypilot](https://github.com/Tecnologic/cypilot)** and
+> this repository is archived. cypilot is the same kind of web app (static
+> HTML, Alpine.js, uPlot, a REST and WebSocket API) with all of cymon's
+> functions plus enabling and stopping drives, settings profiles, plots across
+> nodes, recorded runs and a multi-node scope. Its code is Apache-2.0.
+>
+> | cymon | cypilot |
+> |---|---|
+> | `cymon serve`, `cymon` (executable) | `cypilot` or `cypilot-ctl serve` |
+> | `cymon demo` | `cypilot-ctl serve --demo 2`, or "demo" in the Bus view |
+> | `cymon adapters`, `cymon dsdl` | `cypilot-ctl adapters`, `cypilot-ctl dsdl` |
+> | Bus, Nodes, Registers, Commands | Bus, Nodes, Registers (store, restart), `cypilot-ctl command` |
+> | Monitor, Publish | Monitor (any subject, publications with a lease), Plots |
+> | Scope | Scope (one node or several on one trigger) |
+> | `canable` python-can interface | the same, `canable:COM5` or `canable:/dev/ttyACM0` |
+>
+> The firmware library [cymon-lib](https://github.com/Tecnologic/cymon-lib)
+> and its `cymon` DSDL keep their names and stay maintained.
+
 **Cyphal admin tool for the host.** cymon connects to a Cyphal/CAN bus
 through one or more USB CAN FD adapters (CANable 2.0 / 2.0 Pro and others)
 and serves a web UI on the same computer:
